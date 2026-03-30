@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">Image to PDF</string>
+    <string name="add_images">Add Images</string>
+    <string name="convert_to_pdf">Convert to PDF</string>
+    <string name="share_pdf">Share PDF</string>
+    <string name="no_images_hint">No images selected.\nTap the button below to pick images from your gallery.</string>
+    <string name="permission_rationale_title">Photo Access Required</string>
+    <string name="permission_rationale_message">This app needs access to your photos to select images for PDF conversion.</string>
+    <string name="open_settings">Open Settings</string>
+    <string name="grant_permission">Grant Permission</string>
+    <string name="cancel">Cancel</string>
+    <string name="conversion_success">PDF saved to Downloads!</string>
+    <string name="conversion_error">Failed to create PDF. Please try again.</string>
+    <string name="remove_image">Remove image</string>
+    <string name="drag_handle">Drag to reorder</string>
+    <string name="pdf_page_size">Page Size</string>
+    <string name="page_size_a4">A4</string>
+    <string name="page_size_letter">Letter</string>
+    <string name="page_size_auto">Auto</string>
+    <string name="coming_soon">Coming soon</string>
+</resources>
