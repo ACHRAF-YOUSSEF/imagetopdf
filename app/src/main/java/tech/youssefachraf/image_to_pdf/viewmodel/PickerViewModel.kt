@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,7 +33,10 @@ data class PickerUiState(
     val pickerState: PickerState = PickerState.Idle,
 )
 
-class PickerViewModel(application: Application) : AndroidViewModel(application) {
+class PickerViewModel(
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    application: Application
+) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(PickerUiState())
     val uiState: StateFlow<PickerUiState> = _uiState.asStateFlow()
 
@@ -95,7 +99,7 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
         val images = _uiState.value.selectedImages
         if (images.isEmpty()) return
 
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatcher) {
             _uiState.update { it.copy(showNameDialog = false, pickerState = PickerState.Converting) }
             try {
                 val resultUri = PdfConverter.convert(

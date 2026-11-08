@@ -44,6 +44,7 @@ import tech.youssefachraf.image_to_pdf.ui.theme.DarkBackground
 import tech.youssefachraf.image_to_pdf.ui.theme.PdfBadgeRed
 import tech.youssefachraf.image_to_pdf.ui.theme.PrimaryText
 import tech.youssefachraf.image_to_pdf.ui.theme.SecondaryText
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun SplashScreen(onSplashComplete: () -> Unit) {
@@ -59,10 +60,10 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
     LaunchedEffect(Unit) {
         appeared = true
         repeat(3) { i ->
-            delay(400)
+            delay(400.milliseconds)
             activeDot = i
         }
-        delay(300)
+        delay(300.milliseconds)
         onSplashComplete()
     }
 

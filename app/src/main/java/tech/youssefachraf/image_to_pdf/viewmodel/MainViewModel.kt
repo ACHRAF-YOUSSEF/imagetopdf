@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +20,10 @@ data class HomeUiState(
     val searchQuery: String = "",
 )
 
-class HomeViewModel(application: Application) : AndroidViewModel(application) {
+class HomeViewModel(
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    application: Application
+) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
@@ -28,7 +32,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadPdfs() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatcher) {
             _uiState.update { it.copy(isLoading = true) }
             val pdfs = PdfConverter.queryAllPdfs(getApplication())
             _uiState.update { it.copy(recentPdfs = pdfs, isLoading = false) }
@@ -42,7 +46,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deletePdf(uri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatcher) {
             if (PdfConverter.deletePdf(getApplication(), uri)) {
                 _uiState.update { state ->
                     state.copy(recentPdfs = state.recentPdfs.filter { it.uri != uri })
@@ -52,7 +56,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun renamePdf(uri: Uri, newName: String) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatcher) {
             if (PdfConverter.renamePdf(getApplication(), uri, newName)) {
                 loadPdfs()
             }
