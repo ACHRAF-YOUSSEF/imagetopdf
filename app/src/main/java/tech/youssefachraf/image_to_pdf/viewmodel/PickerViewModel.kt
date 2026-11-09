@@ -139,6 +139,19 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(selectedImages = emptyList()) }
     }
 
+    fun setImagesSelected(uris: List<Uri>, selected: Boolean) {
+        _uiState.update { state ->
+            val current = state.selectedImages.toMutableList()
+            if (selected) {
+                val existing = current.toHashSet()
+                uris.forEach { uri -> if (existing.add(uri)) current.add(uri) }
+            } else {
+                current.removeAll(uris.toSet())
+            }
+            state.copy(selectedImages = current)
+        }
+    }
+
     fun addImages(uris: List<Uri>) {
         _uiState.update { state ->
             val existing = state.selectedImages.toHashSet()
