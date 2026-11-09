@@ -1,9 +1,8 @@
 package tech.youssefachraf.image_to_pdf.ui.picker
 
-import android.Manifest
 import android.net.Uri
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,7 +43,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import tech.youssefachraf.image_to_pdf.ui.theme.AccentBlue
@@ -53,6 +51,8 @@ import tech.youssefachraf.image_to_pdf.ui.theme.PrimaryText
 import tech.youssefachraf.image_to_pdf.ui.theme.SecondaryText
 import tech.youssefachraf.image_to_pdf.viewmodel.PickerState
 import tech.youssefachraf.image_to_pdf.viewmodel.PickerViewModel
+
+private const val MAX_IMAGE_SELECTION = 500
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,25 +65,20 @@ fun ImagePickerSheet(
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val mediaPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        Manifest.permission.READ_MEDIA_IMAGES
-    } else {
-        Manifest.permission.READ_EXTERNAL_STORAGE
+    // The system Photo Picker grants access only to the images the user selects.
+    // maxItems is a request; Android/device picker implementations may impose a lower cap.
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(
+            maxItems = MAX_IMAGE_SELECTION
+        )
+    ) { uris ->
+        if (uris.isNotEmpty()) pickerViewModel.addImages(uris)
     }
 
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
-    ) { uris -> if (uris.isNotEmpty()) pickerViewModel.addImages(uris) }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted -> if (granted) imagePickerLauncher.launch("image/*") }
-
     fun launchPicker() {
-        if (ContextCompat.checkSelfPermission(context, mediaPermission) ==
-            android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) imagePickerLauncher.launch("image/*")
-        else permissionLauncher.launch(mediaPermission)
+        imagePickerLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        )
     }
 
     if (uiState.selectedImages.isEmpty() && uiState.pickerState is PickerState.Idle) {
