@@ -21,8 +21,8 @@ data class HomeUiState(
 )
 
 class HomeViewModel(
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    application: Application
+    application: Application,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()

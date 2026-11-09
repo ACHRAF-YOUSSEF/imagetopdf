@@ -54,14 +54,14 @@ data class PickerUiState(
 )
 
 class PickerViewModel(
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    application: Application
+    application: Application,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(PickerUiState())
     val uiState: StateFlow<PickerUiState> = _uiState.asStateFlow()
 
     fun loadGalleryImages() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatcher) {
             _uiState.update { it.copy(isGalleryLoading = true) }
             try {
                 val resolver = getApplication<Application>().contentResolver
@@ -119,7 +119,7 @@ class PickerViewModel(
                         isGalleryLoading = false
                     )
                 }
-            } catch (exception: Exception) {
+            } catch (_: Exception) {
                 _uiState.update { it.copy(isGalleryLoading = false) }
             }
         }
