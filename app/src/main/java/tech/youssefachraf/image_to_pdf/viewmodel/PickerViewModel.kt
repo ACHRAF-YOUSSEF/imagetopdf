@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -115,7 +116,7 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
                         isGalleryLoading = false
                     )
                 }
-            } catch (exception: Exception) {
+            } catch (_: Exception) {
                 _uiState.update { it.copy(isGalleryLoading = false) }
             }
         }
@@ -149,14 +150,6 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
                 current.removeAll(uris.toSet())
             }
             state.copy(selectedImages = current)
-        }
-    }
-
-    fun addImages(uris: List<Uri>) {
-        _uiState.update { state ->
-            val existing = state.selectedImages.toHashSet()
-            val newUris = uris.filter { it !in existing }
-            state.copy(selectedImages = state.selectedImages + newUris)
         }
     }
 

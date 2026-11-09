@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,9 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -44,6 +40,7 @@ import tech.youssefachraf.image_to_pdf.ui.theme.DarkBackground
 import tech.youssefachraf.image_to_pdf.ui.theme.PdfBadgeRed
 import tech.youssefachraf.image_to_pdf.ui.theme.PrimaryText
 import tech.youssefachraf.image_to_pdf.ui.theme.SecondaryText
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun SplashScreen(onSplashComplete: () -> Unit) {
@@ -59,10 +56,10 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
     LaunchedEffect(Unit) {
         appeared = true
         repeat(3) { i ->
-            delay(400)
+            delay(400.milliseconds)
             activeDot = i
         }
-        delay(300)
+        delay(300.milliseconds)
         onSplashComplete()
     }
 
