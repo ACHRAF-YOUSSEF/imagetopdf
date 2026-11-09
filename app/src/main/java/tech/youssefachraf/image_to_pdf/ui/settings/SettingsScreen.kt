@@ -126,7 +126,7 @@ fun SettingsScreen(
                         onClick = {
                             val intent = Intent(
                                 Intent.ACTION_VIEW,
-                                "https://github.com/ACHRAF-YOUSSEF/kotlin-projects/image-to-pdf".toUri()
+                                "https://github.com/ACHRAF-YOUSSEF/imagetopdf".toUri()
                             )
                             context.startActivity(intent)
                         },
@@ -145,7 +145,7 @@ fun SettingsScreen(
                         onClick = {
                             val intent = Intent(
                                 Intent.ACTION_VIEW,
-                                "https://github.com/ACHRAF-YOUSSEF/kotlin-projects/image-to-pdf/releases/latest".toUri()
+                                "https://github.com/ACHRAF-YOUSSEF/imagetopdf/releases/latest".toUri()
                             )
                             context.startActivity(intent)
                         },
