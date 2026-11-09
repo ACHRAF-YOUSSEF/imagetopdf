@@ -3,7 +3,6 @@ package tech.youssefachraf.image_to_pdf.ui.picker
 import android.Manifest
 import android.net.Uri
 import android.os.Build
-import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -25,7 +24,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -192,6 +190,9 @@ fun ImagePickerSheet(
                                 )
                                 if (selected) {
                                     Box(
+                                        Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.16f))
+                                    )
+                                    Box(
                                         modifier = Modifier
                                             .align(Alignment.TopEnd)
                                             .padding(6.dp)
@@ -201,9 +202,6 @@ fun ImagePickerSheet(
                                     ) {
                                         Icon(Icons.Default.Check, "Selected", tint = Color.White, modifier = Modifier.size(17.dp))
                                     }
-                                    Box(
-                                        Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.16f))
-                                    )
                                 }
                             }
                         }
