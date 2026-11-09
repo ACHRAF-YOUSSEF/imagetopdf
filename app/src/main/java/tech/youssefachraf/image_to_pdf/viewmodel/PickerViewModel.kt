@@ -2,6 +2,7 @@ package tech.youssefachraf.image_to_pdf.viewmodel
 
 import android.app.Application
 import android.net.Uri
+import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +26,15 @@ sealed class PickerState {
     ) : PickerState()
 }
 
+data class GalleryImage(
+    val uri: Uri,
+    val displayName: String,
+    val dateAdded: Long
+)
+
 data class PickerUiState(
+    val galleryImages: List<GalleryImage> = emptyList(),
+    val isGalleryLoading: Boolean = false,
     val selectedImages: List<Uri> = emptyList(),
     val pdfName: String = "",
     val showNameDialog: Boolean = false,
@@ -35,6 +44,61 @@ data class PickerUiState(
 class PickerViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(PickerUiState())
     val uiState: StateFlow<PickerUiState> = _uiState.asStateFlow()
+
+    fun loadGalleryImages() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isGalleryLoading = true) }
+            try {
+                val resolver = getApplication<Application>().contentResolver
+                val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                val projection = arrayOf(
+                    MediaStore.Images.Media._ID,
+                    MediaStore.Images.Media.DISPLAY_NAME,
+                    MediaStore.Images.Media.DATE_ADDED
+                )
+                val images = mutableListOf<GalleryImage>()
+                resolver.query(
+                    collection,
+                    projection,
+                    null,
+                    null,
+                    "${MediaStore.Images.Media.DATE_ADDED} DESC"
+                )?.use { cursor ->
+                    val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                    val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                    val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idColumn)
+                        val uri = Uri.withAppendedPath(collection, id.toString())
+                        images.add(
+                            GalleryImage(
+                                uri = uri,
+                                displayName = cursor.getString(nameColumn) ?: "Image",
+                                dateAdded = cursor.getLong(dateColumn)
+                            )
+                        )
+                    }
+                }
+                _uiState.update { it.copy(galleryImages = images, isGalleryLoading = false) }
+            } catch (exception: Exception) {
+                _uiState.update { it.copy(isGalleryLoading = false) }
+            }
+        }
+    }
+
+    fun toggleImage(uri: Uri) {
+        _uiState.update { state ->
+            val selected = state.selectedImages
+            state.copy(
+                selectedImages = if (uri in selected) selected.filterNot { it == uri }
+                else selected + uri
+            )
+        }
+    }
+
+    fun clearSelection() {
+        _uiState.update { it.copy(selectedImages = emptyList()) }
+    }
 
     fun addImages(uris: List<Uri>) {
         _uiState.update { state ->
