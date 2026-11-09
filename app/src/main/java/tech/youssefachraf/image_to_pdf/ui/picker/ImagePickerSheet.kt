@@ -52,7 +52,7 @@ import tech.youssefachraf.image_to_pdf.ui.theme.SecondaryText
 import tech.youssefachraf.image_to_pdf.viewmodel.PickerState
 import tech.youssefachraf.image_to_pdf.viewmodel.PickerViewModel
 
-private const val MAX_IMAGE_SELECTION = 500
+private const val MAX_IMAGE_SELECTION = 150
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
