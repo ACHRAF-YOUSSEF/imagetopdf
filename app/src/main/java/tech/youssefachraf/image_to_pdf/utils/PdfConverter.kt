@@ -45,11 +45,9 @@ object PdfConverter {
     }
 
     fun resolveFileName(context: Context, baseName: String): Pair<Boolean, String> {
-        // Check if baseName.pdf exists
         if (!fileExists(context, "$baseName.pdf")) {
             return Pair(false, baseName)
         }
-        // Find next available
         var counter = 1
         while (fileExists(context, "${baseName}_($counter).pdf")) {
             counter++
@@ -79,24 +77,31 @@ object PdfConverter {
         pageSize: PageSize = PageSize.A4,
         fileName: String? = null
     ): Uri {
+        require(uris.isNotEmpty()) { "Select at least one image." }
+
         val pdfDocument = PdfDocument()
         try {
             uris.forEachIndexed { index, uri ->
-                val bitmap = decodeSampledBitmap(context, uri) ?: return@forEachIndexed
+                val bitmap = decodeSampledBitmap(context, uri)
+                    ?: throw IllegalArgumentException(
+                        "Could not read image ${index + 1} of ${uris.size}. It may have been moved or is unsupported."
+                    )
 
-                val (pageWidth, pageHeight) = when (pageSize) {
-                    PageSize.A4 -> Pair(A4_WIDTH, A4_HEIGHT)
-                    PageSize.LETTER -> Pair(LETTER_WIDTH, LETTER_HEIGHT)
-                    PageSize.AUTO -> Pair(bitmap.width, bitmap.height)
+                try {
+                    val (pageWidth, pageHeight) = when (pageSize) {
+                        PageSize.A4 -> Pair(A4_WIDTH, A4_HEIGHT)
+                        PageSize.LETTER -> Pair(LETTER_WIDTH, LETTER_HEIGHT)
+                        PageSize.AUTO -> Pair(bitmap.width, bitmap.height)
+                    }
+
+                    val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, index + 1).create()
+                    val page = pdfDocument.startPage(pageInfo)
+                    drawBitmapFitted(page.canvas, bitmap, pageWidth.toFloat(), pageHeight.toFloat())
+                    pdfDocument.finishPage(page)
+                } finally {
+                    // Always release the decoded bitmap, including when drawing fails.
+                    bitmap.recycle()
                 }
-
-                val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, index + 1).create()
-                val page = pdfDocument.startPage(pageInfo)
-
-                drawBitmapFitted(page.canvas, bitmap, pageWidth.toFloat(), pageHeight.toFloat())
-
-                pdfDocument.finishPage(page)
-                bitmap.recycle()
             }
 
             val actualFileName = fileName ?: "ImageToPdf_${System.currentTimeMillis()}"
@@ -123,7 +128,6 @@ object PdfConverter {
         val left = (pageWidth - destWidth) / 2f
         val top = (pageHeight - destHeight) / 2f
         val destRect = RectF(left, top, left + destWidth, top + destHeight)
-
         canvas.drawBitmap(bitmap, null, destRect, Paint(Paint.FILTER_BITMAP_FLAG))
     }
 
@@ -132,6 +136,10 @@ object PdfConverter {
             val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             context.contentResolver.openInputStream(uri)?.use { stream ->
                 BitmapFactory.decodeStream(stream, null, boundsOptions)
+            }
+
+            if (boundsOptions.outWidth <= 0 || boundsOptions.outHeight <= 0) {
+                return null
             }
 
             val sampleSize = calculateInSampleSize(
@@ -153,19 +161,20 @@ object PdfConverter {
         }
     }
 
-    private fun calculateInSampleSize(
+    internal fun calculateInSampleSize(
         width: Int,
         height: Int,
         reqWidth: Int,
         reqHeight: Int
     ): Int {
+        if (width <= 0 || height <= 0 || reqWidth <= 0 || reqHeight <= 0) return 1
+
         var sampleSize = 1
-        if (height > reqHeight || width > reqWidth) {
-            val halfHeight = height / 2
-            val halfWidth = width / 2
-            while ((halfHeight / sampleSize) >= reqHeight && (halfWidth / sampleSize) >= reqWidth) {
-                sampleSize *= 2
-            }
+        while (
+            width / (sampleSize * 2) >= reqWidth ||
+            height / (sampleSize * 2) >= reqHeight
+        ) {
+            sampleSize *= 2
         }
         return sampleSize
     }
@@ -180,19 +189,22 @@ object PdfConverter {
 
             val resolver = context.contentResolver
             val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-
             val itemUri = resolver.insert(collection, contentValues)
                 ?: throw Exception("MediaStore insert failed — cannot create Downloads entry")
 
-            resolver.openOutputStream(itemUri)?.use { outputStream ->
-                pdfDocument.writeTo(outputStream)
-            } ?: throw Exception("Could not open output stream for MediaStore URI")
+            try {
+                resolver.openOutputStream(itemUri)?.use { outputStream ->
+                    pdfDocument.writeTo(outputStream)
+                } ?: throw Exception("Could not open output stream for MediaStore URI")
 
-            contentValues.clear()
-            contentValues.put(MediaStore.Downloads.IS_PENDING, 0)
-            resolver.update(itemUri, contentValues, null, null)
-
-            itemUri
+                contentValues.clear()
+                contentValues.put(MediaStore.Downloads.IS_PENDING, 0)
+                resolver.update(itemUri, contentValues, null, null)
+                itemUri
+            } catch (exception: Exception) {
+                resolver.delete(itemUri, null, null)
+                throw exception
+            }
         } else {
             val downloadsDir =
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
@@ -238,11 +250,10 @@ object PdfConverter {
                     val id = cursor.getLong(idCol)
                     val name = cursor.getString(nameCol) ?: "Unknown"
                     val size = cursor.getLong(sizeCol)
-                    val date = cursor.getLong(dateCol) * 1000 // seconds -> ms
+                    val date = cursor.getLong(dateCol) * 1000
 
                     val uri = android.content.ContentUris.withAppendedId(collection, id)
                     val pageCount = getPdfPageCount(context, uri)
-
                     pdfs.add(PdfFileInfo(uri, name, pageCount, size, date))
                 }
             }

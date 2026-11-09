@@ -1,10 +1,6 @@
 package tech.youssefachraf.image_to_pdf.ui.picker
 
-import android.Manifest
 import android.net.Uri
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,11 +57,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import sh.calvin.reorderable.ReorderableItem
@@ -90,7 +84,6 @@ fun PreviewReorderScreen(
     val uiState by pickerViewModel.uiState.collectAsStateWithLifecycle()
     val images = uiState.selectedImages
     val pickerState = uiState.pickerState
-    val context = LocalContext.current
 
     val lazyListState = rememberLazyListState()
     val reorderableState = rememberReorderableLazyListState(
@@ -99,25 +92,9 @@ fun PreviewReorderScreen(
     )
 
     var previewUri by remember { mutableStateOf<Uri?>(null) }
+    var showImagePicker by remember { mutableStateOf(false) }
 
-    val mediaPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        Manifest.permission.READ_MEDIA_IMAGES
-    } else {
-        Manifest.permission.READ_EXTERNAL_STORAGE
-    }
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
-    ) { uris -> if (uris.isNotEmpty()) pickerViewModel.addImages(uris) }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted -> if (granted) imagePickerLauncher.launch("image/*") }
 
-    fun launchPicker() {
-        if (ContextCompat.checkSelfPermission(context, mediaPermission) ==
-            android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) imagePickerLauncher.launch("image/*")
-        else permissionLauncher.launch(mediaPermission)
-    }
 
     if (uiState.showNameDialog) {
         PdfNameDialog(
@@ -144,6 +121,15 @@ fun PreviewReorderScreen(
             pickerViewModel.reset()
             onDone()
         }
+    }
+
+
+    if (showImagePicker) {
+        ImagePickerSheet(
+            pickerViewModel = pickerViewModel,
+            onDismiss = { showImagePicker = false },
+            onConfirmed = { showImagePicker = false },
+        )
     }
 
     previewUri?.let { uri ->
@@ -178,7 +164,7 @@ fun PreviewReorderScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = ::launchPicker) {
+                    IconButton(onClick = { showImagePicker = true }) {
                         Icon(Icons.Default.Add, "Add more images", tint = AccentBlue)
                     }
                 },

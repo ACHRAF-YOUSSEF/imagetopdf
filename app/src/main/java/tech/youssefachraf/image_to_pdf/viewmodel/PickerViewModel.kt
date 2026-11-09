@@ -2,6 +2,7 @@ package tech.youssefachraf.image_to_pdf.viewmodel
 
 import android.app.Application
 import android.net.Uri
+import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CoroutineDispatcher
@@ -26,7 +27,26 @@ sealed class PickerState {
     ) : PickerState()
 }
 
+data class GalleryImage(
+    val uri: Uri,
+    val displayName: String,
+    val dateAdded: Long,
+    val albumId: Long,
+    val albumName: String
+)
+
+data class GalleryAlbum(
+    val id: Long?,
+    val name: String,
+    val imageCount: Int,
+    val coverUri: Uri?
+)
+
 data class PickerUiState(
+    val galleryImages: List<GalleryImage> = emptyList(),
+    val galleryAlbums: List<GalleryAlbum> = emptyList(),
+    val selectedAlbumId: Long? = null,
+    val isGalleryLoading: Boolean = false,
     val selectedImages: List<Uri> = emptyList(),
     val pdfName: String = "",
     val showNameDialog: Boolean = false,
@@ -39,6 +59,89 @@ class PickerViewModel(
 ) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(PickerUiState())
     val uiState: StateFlow<PickerUiState> = _uiState.asStateFlow()
+
+    fun loadGalleryImages() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isGalleryLoading = true) }
+            try {
+                val resolver = getApplication<Application>().contentResolver
+                val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                val projection = arrayOf(
+                    MediaStore.Images.Media._ID,
+                    MediaStore.Images.Media.DISPLAY_NAME,
+                    MediaStore.Images.Media.DATE_ADDED,
+                    MediaStore.Images.Media.BUCKET_ID,
+                    MediaStore.Images.Media.BUCKET_DISPLAY_NAME
+                )
+                val images = mutableListOf<GalleryImage>()
+                resolver.query(
+                    collection,
+                    projection,
+                    null,
+                    null,
+                    "${MediaStore.Images.Media.DATE_ADDED} DESC"
+                )?.use { cursor ->
+                    val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                    val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                    val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+                    val bucketIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_ID)
+                    val bucketNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idColumn)
+                        val uri = Uri.withAppendedPath(collection, id.toString())
+                        images.add(
+                            GalleryImage(
+                                uri = uri,
+                                displayName = cursor.getString(nameColumn) ?: "Image",
+                                dateAdded = cursor.getLong(dateColumn),
+                                albumId = cursor.getLong(bucketIdColumn),
+                                albumName = cursor.getString(bucketNameColumn) ?: "Other"
+                            )
+                        )
+                    }
+                }
+                val albums = images
+                    .groupBy { it.albumId }
+                    .map { (id, albumImages) ->
+                        GalleryAlbum(
+                            id = id,
+                            name = albumImages.first().albumName,
+                            imageCount = albumImages.size,
+                            coverUri = albumImages.firstOrNull()?.uri
+                        )
+                    }
+                    .sortedBy { it.name.lowercase() }
+                _uiState.update {
+                    it.copy(
+                        galleryImages = images,
+                        galleryAlbums = albums,
+                        selectedAlbumId = null,
+                        isGalleryLoading = false
+                    )
+                }
+            } catch (exception: Exception) {
+                _uiState.update { it.copy(isGalleryLoading = false) }
+            }
+        }
+    }
+
+    fun selectAlbum(albumId: Long?) {
+        _uiState.update { it.copy(selectedAlbumId = albumId) }
+    }
+
+    fun toggleImage(uri: Uri) {
+        _uiState.update { state ->
+            val selected = state.selectedImages
+            state.copy(
+                selectedImages = if (uri in selected) selected.filterNot { it == uri }
+                else selected + uri
+            )
+        }
+    }
+
+    fun clearSelection() {
+        _uiState.update { it.copy(selectedImages = emptyList()) }
+    }
 
     fun addImages(uris: List<Uri>) {
         _uiState.update { state ->
