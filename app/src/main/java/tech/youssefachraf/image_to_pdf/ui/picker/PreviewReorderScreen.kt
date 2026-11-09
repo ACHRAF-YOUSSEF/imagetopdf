@@ -57,7 +57,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -85,7 +84,6 @@ fun PreviewReorderScreen(
     val uiState by pickerViewModel.uiState.collectAsStateWithLifecycle()
     val images = uiState.selectedImages
     val pickerState = uiState.pickerState
-    val context = LocalContext.current
 
     val lazyListState = rememberLazyListState()
     val reorderableState = rememberReorderableLazyListState(
