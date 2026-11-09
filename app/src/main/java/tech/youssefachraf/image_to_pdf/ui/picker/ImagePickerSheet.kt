@@ -1,8 +1,10 @@
 package tech.youssefachraf.image_to_pdf.ui.picker
 
+import android.Manifest
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -10,20 +12,24 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,14 +40,19 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import tech.youssefachraf.image_to_pdf.ui.theme.AccentBlue
@@ -51,8 +62,6 @@ import tech.youssefachraf.image_to_pdf.ui.theme.SecondaryText
 import tech.youssefachraf.image_to_pdf.viewmodel.PickerState
 import tech.youssefachraf.image_to_pdf.viewmodel.PickerViewModel
 
-private const val MAX_IMAGE_SELECTION = 100
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImagePickerSheet(
@@ -61,31 +70,49 @@ fun ImagePickerSheet(
     onConfirmed: () -> Unit,
 ) {
     val uiState by pickerViewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var permissionRequested by remember { mutableStateOf(false) }
 
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(
-            maxItems = MAX_IMAGE_SELECTION
-        )
-    ) { uris ->
-        if (uris.isNotEmpty()) pickerViewModel.addImages(uris)
+    val permissions = remember {
+        when {
+            Build.VERSION.SDK_INT >= 34 -> arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+            )
+            Build.VERSION.SDK_INT >= 33 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+            else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
     }
 
-    fun launchPicker() {
-        imagePickerLauncher.launch(
-            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-        )
+    fun hasImagePermission(): Boolean {
+        val fullAccess = ContextCompat.checkSelfPermission(
+            context, permissions[0]
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val selectedAccess = Build.VERSION.SDK_INT >= 34 &&
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        return fullAccess || selectedAccess
     }
 
-    if (uiState.selectedImages.isEmpty() && uiState.pickerState is PickerState.Idle) {
-        LaunchedEffect(Unit) { launchPicker() }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        if (hasImagePermission()) pickerViewModel.loadGalleryImages()
+    }
+
+    LaunchedEffect(Unit) {
+        if (hasImagePermission()) {
+            pickerViewModel.loadGalleryImages()
+        } else if (!permissionRequested) {
+            permissionRequested = true
+            permissionLauncher.launch(permissions)
+        }
     }
 
     ModalBottomSheet(
-        onDismissRequest = {
-            pickerViewModel.reset()
-            onDismiss()
-        },
+        onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = DarkCard,
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
@@ -93,96 +120,110 @@ fun ImagePickerSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 32.dp)
+                .height(680.dp)
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 24.dp)
         ) {
-            Text(
-                text = "Select Images",
-                style = MaterialTheme.typography.titleLarge,
-                color = PrimaryText,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Select Images", style = MaterialTheme.typography.titleLarge, color = PrimaryText)
+                    Text(
+                        "${uiState.selectedImages.size} selected · No 100-item picker limit",
+                        color = SecondaryText,
+                        fontSize = 12.sp
+                    )
+                }
+                TextButton(onClick = pickerViewModel::clearSelection) {
+                    Text("Clear", color = AccentBlue)
+                }
+            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
-            if (uiState.selectedImages.isNotEmpty()) {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(vertical = 8.dp),
-                ) {
-                    items(uiState.selectedImages, key = { it.toString() }) { uri ->
-                        SmallImageThumbnail(uri = uri, onRemove = { pickerViewModel.removeImage(uri) })
-                    }
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF21262D))
-                                .clickable { launchPicker() },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(Icons.Default.Add, "Add more", tint = SecondaryText, modifier = Modifier.size(28.dp))
+            when {
+                !hasImagePermission() -> {
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Photo access is required to browse your gallery.", color = SecondaryText)
+                            TextButton(onClick = { permissionLauncher.launch(permissions) }) {
+                                Text("Grant access", color = AccentBlue)
+                            }
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    "${uiState.selectedImages.size} image${if (uiState.selectedImages.size != 1) "s" else ""} selected",
-                    color = SecondaryText,
-                    fontSize = 13.sp,
-                )
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(100.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("No images selected", color = SecondaryText, fontSize = 14.sp)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        TextButton(onClick = ::launchPicker) {
-                            Text("Pick Images", color = AccentBlue)
+                uiState.isGalleryLoading -> {
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = AccentBlue)
+                    }
+                }
+                uiState.galleryImages.isEmpty() -> {
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Image, null, tint = SecondaryText, modifier = Modifier.size(40.dp))
+                            Text("No accessible images found", color = SecondaryText)
+                        }
+                    }
+                }
+                else -> {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(uiState.galleryImages, key = { it.uri.toString() }) { image ->
+                            val selected = image.uri in uiState.selectedImages
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(116.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { pickerViewModel.toggleImage(image.uri) }
+                            ) {
+                                AsyncImage(
+                                    model = image.uri,
+                                    contentDescription = image.displayName,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.matchParentSize()
+                                )
+                                if (selected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(6.dp)
+                                            .size(25.dp)
+                                            .background(AccentBlue, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.Check, "Selected", tint = Color.White, modifier = Modifier.size(17.dp))
+                                    }
+                                    Box(
+                                        Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.16f))
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = onConfirmed,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = uiState.selectedImages.isNotEmpty(),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Confirm Selection", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 4.dp))
+                Text(
+                    "Use ${uiState.selectedImages.size} image${if (uiState.selectedImages.size == 1) "" else "s"}",
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
             }
-        }
-    }
-}
-
-@Composable
-private fun SmallImageThumbnail(uri: Uri, onRemove: () -> Unit) {
-    Box(modifier = Modifier.size(80.dp)) {
-        AsyncImage(
-            model = uri,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)),
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(2.dp)
-                .size(22.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.7f))
-                .clickable(onClick = onRemove),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Default.Close, "Remove", tint = Color.White, modifier = Modifier.size(14.dp))
         }
     }
 }
