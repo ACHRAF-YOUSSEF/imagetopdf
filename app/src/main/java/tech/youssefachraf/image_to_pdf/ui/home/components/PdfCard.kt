@@ -185,15 +185,12 @@ fun PdfCard(
 }
 
 @Composable
-private fun PdfThumbnail(
-    dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    uri: Uri
-) {
+private fun PdfThumbnail(uri: Uri) {
     val context = LocalContext.current
     var thumbnail by remember(uri) { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(uri) {
-        thumbnail = withContext(dispatcher) {
+        thumbnail = withContext(Dispatchers.IO) {
             try {
                 context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
                     val renderer = PdfRenderer(pfd)

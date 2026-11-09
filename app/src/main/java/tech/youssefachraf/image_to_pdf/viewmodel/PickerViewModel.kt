@@ -53,15 +53,12 @@ data class PickerUiState(
     val pickerState: PickerState = PickerState.Idle,
 )
 
-class PickerViewModel(
-    application: Application,
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
-) : AndroidViewModel(application) {
+class PickerViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(PickerUiState())
     val uiState: StateFlow<PickerUiState> = _uiState.asStateFlow()
 
     fun loadGalleryImages() {
-        viewModelScope.launch(dispatcher) {
+        viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isGalleryLoading = true) }
             try {
                 val resolver = getApplication<Application>().contentResolver
@@ -143,14 +140,6 @@ class PickerViewModel(
         _uiState.update { it.copy(selectedImages = emptyList()) }
     }
 
-    fun addImages(uris: List<Uri>) {
-        _uiState.update { state ->
-            val existing = state.selectedImages.toHashSet()
-            val newUris = uris.filter { it !in existing }
-            state.copy(selectedImages = state.selectedImages + newUris)
-        }
-    }
-
     fun removeImage(uri: Uri) {
         _uiState.update { state ->
             state.copy(selectedImages = state.selectedImages.filter { it != uri })
@@ -202,7 +191,7 @@ class PickerViewModel(
         val images = _uiState.value.selectedImages
         if (images.isEmpty()) return
 
-        viewModelScope.launch(dispatcher) {
+        viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(showNameDialog = false, pickerState = PickerState.Converting) }
             try {
                 val resultUri = PdfConverter.convert(
