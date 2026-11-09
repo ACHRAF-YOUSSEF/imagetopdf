@@ -21,9 +21,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Image
@@ -182,6 +185,36 @@ fun ImagePickerSheet(
                 uiState.galleryImages.filter { it.albumId == albumId }
             } ?: uiState.galleryImages
 
+            val allVisibleSelected = visibleImages.isNotEmpty() &&
+                visibleImages.all { it.uri in uiState.selectedImages }
+
+            Text(
+                "Long-press and drag across photos to select multiple.",
+                color = SecondaryText,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    onClick = {
+                        pickerViewModel.setImagesSelected(
+                            visibleImages.map { it.uri },
+                            selected = !allVisibleSelected
+                        )
+                    },
+                    enabled = visibleImages.isNotEmpty() && !uiState.isGalleryLoading
+                ) {
+                    Text(
+                        if (allVisibleSelected) "Deselect all" else "Select all",
+                        color = AccentBlue
+                    )
+                }
+            }
+
             when {
                 !hasImagePermission() -> {
                     Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -207,9 +240,41 @@ fun ImagePickerSheet(
                     }
                 }
                 else -> {
+                    val gridState = rememberLazyGridState()
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(3),
-                        modifier = Modifier.weight(1f),
+                        state = gridState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .pointerInput(visibleImages, uiState.selectedAlbumId) {
+                                var lastSelectedUri: Uri? = null
+
+                                fun selectImageAt(x: Float, y: Float) {
+                                    val item = gridState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
+                                        x >= info.offset.x &&
+                                            x < info.offset.x + info.size.width &&
+                                            y >= info.offset.y &&
+                                            y < info.offset.y + info.size.height
+                                    } ?: return
+                                    val image = visibleImages.getOrNull(item.index) ?: return
+                                    if (image.uri == lastSelectedUri) return
+                                    lastSelectedUri = image.uri
+                                    pickerViewModel.setImagesSelected(
+                                        listOf(image.uri),
+                                        selected = true
+                                    )
+                                }
+
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { offset ->
+                                        selectImageAt(offset.x, offset.y)
+                                    },
+                                    onDrag = { change, _ ->
+                                        change.consume()
+                                        selectImageAt(change.position.x, change.position.y)
+                                    }
+                                )
+                            },
                         contentPadding = PaddingValues(bottom = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
