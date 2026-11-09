@@ -29,11 +29,22 @@ sealed class PickerState {
 data class GalleryImage(
     val uri: Uri,
     val displayName: String,
-    val dateAdded: Long
+    val dateAdded: Long,
+    val albumId: Long,
+    val albumName: String
+)
+
+data class GalleryAlbum(
+    val id: Long?,
+    val name: String,
+    val imageCount: Int,
+    val coverUri: Uri?
 )
 
 data class PickerUiState(
     val galleryImages: List<GalleryImage> = emptyList(),
+    val galleryAlbums: List<GalleryAlbum> = emptyList(),
+    val selectedAlbumId: Long? = null,
     val isGalleryLoading: Boolean = false,
     val selectedImages: List<Uri> = emptyList(),
     val pdfName: String = "",
@@ -54,7 +65,9 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
                 val projection = arrayOf(
                     MediaStore.Images.Media._ID,
                     MediaStore.Images.Media.DISPLAY_NAME,
-                    MediaStore.Images.Media.DATE_ADDED
+                    MediaStore.Images.Media.DATE_ADDED,
+                    MediaStore.Images.Media.BUCKET_ID,
+                    MediaStore.Images.Media.BUCKET_DISPLAY_NAME
                 )
                 val images = mutableListOf<GalleryImage>()
                 resolver.query(
@@ -67,6 +80,8 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
                     val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
                     val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
                     val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
+                    val bucketIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_ID)
+                    val bucketNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
                     while (cursor.moveToNext()) {
                         val id = cursor.getLong(idColumn)
                         val uri = Uri.withAppendedPath(collection, id.toString())
@@ -74,16 +89,40 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
                             GalleryImage(
                                 uri = uri,
                                 displayName = cursor.getString(nameColumn) ?: "Image",
-                                dateAdded = cursor.getLong(dateColumn)
+                                dateAdded = cursor.getLong(dateColumn),
+                                albumId = cursor.getLong(bucketIdColumn),
+                                albumName = cursor.getString(bucketNameColumn) ?: "Other"
                             )
                         )
                     }
                 }
-                _uiState.update { it.copy(galleryImages = images, isGalleryLoading = false) }
+                val albums = images
+                    .groupBy { it.albumId }
+                    .map { (id, albumImages) ->
+                        GalleryAlbum(
+                            id = id,
+                            name = albumImages.first().albumName,
+                            imageCount = albumImages.size,
+                            coverUri = albumImages.firstOrNull()?.uri
+                        )
+                    }
+                    .sortedBy { it.name.lowercase() }
+                _uiState.update {
+                    it.copy(
+                        galleryImages = images,
+                        galleryAlbums = albums,
+                        selectedAlbumId = null,
+                        isGalleryLoading = false
+                    )
+                }
             } catch (exception: Exception) {
                 _uiState.update { it.copy(isGalleryLoading = false) }
             }
         }
+    }
+
+    fun selectAlbum(albumId: Long?) {
+        _uiState.update { it.copy(selectedAlbumId = albumId) }
     }
 
     fun toggleImage(uri: Uri) {
