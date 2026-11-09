@@ -139,7 +139,44 @@ fun ImagePickerSheet(
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
+
+            if (uiState.galleryAlbums.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = uiState.selectedAlbumId == null,
+                        onClick = { pickerViewModel.selectAlbum(null) },
+                        label = { Text("All photos (${uiState.galleryImages.size})") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AccentBlue.copy(alpha = 0.2f),
+                            selectedLabelColor = PrimaryText,
+                            labelColor = SecondaryText
+                        )
+                    )
+                    uiState.galleryAlbums.forEach { album ->
+                        FilterChip(
+                            selected = uiState.selectedAlbumId == album.id,
+                            onClick = { pickerViewModel.selectAlbum(album.id) },
+                            label = { Text("${album.name} (${album.imageCount})") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AccentBlue.copy(alpha = 0.2f),
+                                selectedLabelColor = PrimaryText,
+                                labelColor = SecondaryText
+                            )
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
+            val visibleImages = uiState.selectedAlbumId?.let { albumId ->
+                uiState.galleryImages.filter { it.albumId == albumId }
+            } ?: uiState.galleryImages
 
             when {
                 !hasImagePermission() -> {
@@ -173,7 +210,7 @@ fun ImagePickerSheet(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        items(uiState.galleryImages, key = { it.uri.toString() }) { image ->
+                        items(visibleImages, key = { it.uri.toString() }) { image ->
                             val selected = image.uri in uiState.selectedImages
                             Box(
                                 modifier = Modifier
