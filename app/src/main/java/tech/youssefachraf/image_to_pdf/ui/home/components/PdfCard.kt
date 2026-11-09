@@ -18,10 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -60,6 +60,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import androidx.core.graphics.createBitmap
+import kotlinx.coroutines.CoroutineDispatcher
 
 @Composable
 fun PdfCard(
@@ -175,7 +176,7 @@ fun PdfCard(
                     DropdownMenuItem(
                         text = { Text("Open") },
                         onClick = { showMenu = false; onOpen() },
-                        leadingIcon = { Icon(Icons.Default.OpenInNew, null) }
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, null) }
                     )
                 }
             }
@@ -184,12 +185,15 @@ fun PdfCard(
 }
 
 @Composable
-private fun PdfThumbnail(uri: Uri) {
+private fun PdfThumbnail(
+    dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    uri: Uri
+) {
     val context = LocalContext.current
     var thumbnail by remember(uri) { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(uri) {
-        thumbnail = withContext(Dispatchers.IO) {
+        thumbnail = withContext(dispatcher) {
             try {
                 context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
                     val renderer = PdfRenderer(pfd)
@@ -205,7 +209,7 @@ private fun PdfThumbnail(uri: Uri) {
                         null
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
         }

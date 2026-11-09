@@ -14,11 +14,11 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PictureAsPdf
@@ -49,7 +49,7 @@ val toolItems = listOf(
     ToolItem("Import PDF", Icons.Default.PictureAsPdf),
     ToolItem("Compress", Icons.Default.Compress),
     ToolItem("PDF to JPG", Icons.Default.PhotoLibrary),
-    ToolItem("Merge PDF", Icons.Default.MergeType),
+    ToolItem("Merge PDF", Icons.AutoMirrored.Filled.MergeType),
     ToolItem("Docx to PDF", Icons.Default.Description),
     ToolItem("More", Icons.Default.MoreHoriz),
 )
