@@ -188,6 +188,13 @@ fun ImagePickerSheet(
             val allVisibleSelected = visibleImages.isNotEmpty() &&
                 visibleImages.all { it.uri in uiState.selectedImages }
 
+            Text(
+                "Long-press and drag across photos to select multiple.",
+                color = SecondaryText,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -240,6 +247,8 @@ fun ImagePickerSheet(
                         modifier = Modifier
                             .weight(1f)
                             .pointerInput(visibleImages, uiState.selectedAlbumId) {
+                                var lastSelectedUri: Uri? = null
+
                                 fun selectImageAt(x: Float, y: Float) {
                                     val item = gridState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
                                         x >= info.offset.x &&
@@ -248,6 +257,8 @@ fun ImagePickerSheet(
                                             y < info.offset.y + info.size.height
                                     } ?: return
                                     val image = visibleImages.getOrNull(item.index) ?: return
+                                    if (image.uri == lastSelectedUri) return
+                                    lastSelectedUri = image.uri
                                     pickerViewModel.setImagesSelected(
                                         listOf(image.uri),
                                         selected = true
