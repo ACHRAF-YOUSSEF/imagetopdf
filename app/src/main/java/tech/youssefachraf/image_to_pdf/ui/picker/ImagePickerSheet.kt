@@ -63,8 +63,6 @@ fun ImagePickerSheet(
     val uiState by pickerViewModel.uiState.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // The system Photo Picker grants access only to the images the user selects.
-    // maxItems is a request; Android/device picker implementations may impose a lower cap.
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(
             maxItems = MAX_IMAGE_SELECTION
