@@ -1,7 +1,11 @@
 package tech.youssefachraf.image_to_pdf.ui.common
 
+import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.provider.DocumentsContract
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -31,9 +35,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -80,6 +86,7 @@ import tech.youssefachraf.image_to_pdf.ui.theme.PrimaryText
 import tech.youssefachraf.image_to_pdf.ui.theme.SecondaryText
 import tech.youssefachraf.image_to_pdf.utils.PageSize
 import tech.youssefachraf.image_to_pdf.utils.PdfFileInfo
+import tech.youssefachraf.image_to_pdf.utils.PdfStorageFolder
 import tech.youssefachraf.image_to_pdf.utils.PdfThumbnailCache
 import tech.youssefachraf.image_to_pdf.viewmodel.SelectedPdfSource
 
@@ -594,6 +601,103 @@ private fun PageThumbnailTile(
                         tint = Color.White,
                         modifier = Modifier.size(14.dp),
                     )
+                }
+            }
+        }
+    }
+}
+
+class OpenPdfFolderTreeContract : ActivityResultContracts.OpenDocumentTree() {
+    override fun createIntent(context: Context, input: Uri?): Intent {
+        val targetUri = input ?: PdfStorageFolder.buildInitialFolderUri()
+        return super.createIntent(context, targetUri).apply {
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            )
+            putExtra(DocumentsContract.EXTRA_INITIAL_URI, targetUri)
+        }
+    }
+}
+
+@Composable
+fun PersistentStorageBanner(
+    onLinkFolder: () -> Unit,
+    onImportPdfs: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkCard),
+        border = BorderStroke(1.dp, AccentBlue.copy(alpha = 0.4f)),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(AccentBlue.copy(alpha = 0.14f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.FolderOpen,
+                        contentDescription = null,
+                        tint = AccentBlue,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Keep PDFs across new APK installs",
+                        color = PrimaryText,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Link Download/ImageToPdf so previously generated PDFs stay visible after reinstalling or updating the app.",
+                        color = SecondaryText,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                    )
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Dismiss",
+                        tint = SecondaryText,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onLinkFolder,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                    contentPadding = PaddingValues(vertical = 8.dp),
+                ) {
+                    Text("Link Folder", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
+                OutlinedButton(
+                    onClick = onImportPdfs,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, DarkBorder),
+                    contentPadding = PaddingValues(vertical = 8.dp),
+                ) {
+                    Text("Import Old PDFs", color = PrimaryText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
             }
         }

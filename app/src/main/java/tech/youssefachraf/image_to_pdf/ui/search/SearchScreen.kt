@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import tech.youssefachraf.image_to_pdf.data.FavoritesRepository
 import tech.youssefachraf.image_to_pdf.ui.common.RenamePdfDialog
 import tech.youssefachraf.image_to_pdf.ui.common.openPdf
 import tech.youssefachraf.image_to_pdf.ui.common.sharePdf
@@ -154,8 +155,8 @@ fun SearchScreen(
                         },
                         onDelete = { homeViewModel.deletePdf(pdf.uri) },
                         onOpen = { openPdf(context, pdf.uri) },
-                        isFavorite = pdf.uri.toString() in uiState.favoriteUris,
-                        onToggleFavorite = { homeViewModel.toggleFavorite(pdf.uri) },
+                        isFavorite = FavoritesRepository.isFavorite(pdf, uiState.favoriteUris),
+                        onToggleFavorite = { homeViewModel.toggleFavorite(pdf.uri, pdf.name) },
                         appContext = context,
                     )
                 }

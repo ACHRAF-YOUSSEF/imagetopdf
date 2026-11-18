@@ -1,6 +1,7 @@
 package tech.youssefachraf.image_to_pdf.ui.files
 
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,6 +47,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import tech.youssefachraf.image_to_pdf.data.FavoritesRepository
+import tech.youssefachraf.image_to_pdf.ui.common.OpenPdfFolderTreeContract
 import tech.youssefachraf.image_to_pdf.ui.common.RenamePdfDialog
 import tech.youssefachraf.image_to_pdf.ui.common.openPdf
 import tech.youssefachraf.image_to_pdf.ui.common.sharePdf
@@ -54,6 +58,7 @@ import tech.youssefachraf.image_to_pdf.ui.theme.DarkBackground
 import tech.youssefachraf.image_to_pdf.ui.theme.DarkCard
 import tech.youssefachraf.image_to_pdf.ui.theme.PrimaryText
 import tech.youssefachraf.image_to_pdf.ui.theme.SecondaryText
+import tech.youssefachraf.image_to_pdf.utils.PdfStorageFolder
 import tech.youssefachraf.image_to_pdf.viewmodel.HomeViewModel
 import tech.youssefachraf.image_to_pdf.viewmodel.PdfSortOrder
 
@@ -74,10 +79,18 @@ fun FilesScreen(
     var renameTarget by remember { mutableStateOf<Pair<Uri, String>?>(null) }
     var renameText by remember { mutableStateOf("") }
 
+    val folderLauncher = rememberLauncherForActivityResult(
+        OpenPdfFolderTreeContract()
+    ) { treeUri ->
+        if (treeUri != null) {
+            homeViewModel.onStorageFolderSelected(treeUri)
+        }
+    }
+
     val filteredPdfs = remember(uiState.recentPdfs, uiState.favoriteUris, selectedTab) {
         when (selectedTab) {
             1 -> uiState.recentPdfs.take(10)
-            2 -> uiState.recentPdfs.filter { it.uri.toString() in uiState.favoriteUris }
+            2 -> uiState.recentPdfs.filter { FavoritesRepository.isFavorite(it, uiState.favoriteUris) }
             else -> uiState.recentPdfs
         }
     }
@@ -99,6 +112,15 @@ fun FilesScreen(
                     titleContentColor = PrimaryText,
                 ),
                 actions = {
+                    IconButton(
+                        onClick = { folderLauncher.launch(PdfStorageFolder.buildInitialFolderUri()) }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.FolderOpen,
+                            contentDescription = "Link PDF folder",
+                            tint = if (uiState.linkedFolderUri != null) AccentBlue else PrimaryText,
+                        )
+                    }
                     IconButton(onClick = onNavigateToSearch) {
                         Icon(Icons.Default.Search, "Search", tint = PrimaryText)
                     }
@@ -195,8 +217,8 @@ fun FilesScreen(
                             },
                             onDelete = { homeViewModel.deletePdf(pdf.uri) },
                             onOpen = { openPdf(context, pdf.uri) },
-                            isFavorite = pdf.uri.toString() in uiState.favoriteUris,
-                            onToggleFavorite = { homeViewModel.toggleFavorite(pdf.uri) },
+                            isFavorite = FavoritesRepository.isFavorite(pdf, uiState.favoriteUris),
+                            onToggleFavorite = { homeViewModel.toggleFavorite(pdf.uri, pdf.name) },
                             appContext = context,
                         )
                     }

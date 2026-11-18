@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -97,6 +98,54 @@ class PdfConverterTest {
 
         val defaultName = PdfConverter.generateDefaultFileName()
         assertTrue(defaultName.startsWith("document_"))
+    }
+
+    @Test
+    fun mergeAndDeduplicatePdfs_removesDuplicatesByNameAndSizeAndPreservesDistinctFiles() {
+        val safDoc = PdfFileInfo(
+            uri = "content://com.android.externalstorage.documents/tree/primary%3ADownload%2FImageToPdf/document/doc1".toUri(),
+            name = "invoice.pdf",
+            pageCount = 2,
+            sizeBytes = 2048L,
+            dateModified = 2000L,
+        )
+        val duplicateMediaStore = PdfFileInfo(
+            uri = "content://media/external/downloads/12".toUri(),
+            name = "Invoice.pdf",
+            pageCount = 2,
+            sizeBytes = 2048L,
+            dateModified = 2000L,
+        )
+        val legacyRootPdf = PdfFileInfo(
+            uri = "content://media/external/downloads/9".toUri(),
+            name = "older_root.pdf",
+            pageCount = 1,
+            sizeBytes = 512L,
+            dateModified = 3000L,
+        )
+
+        val merged = PdfConverter.mergeAndDeduplicatePdfs(
+            primary = listOf(safDoc),
+            secondary = listOf(duplicateMediaStore, legacyRootPdf),
+        )
+
+        assertEquals(2, merged.size)
+        assertEquals(legacyRootPdf.uri, merged[0].uri)
+        assertEquals(safDoc.uri, merged[1].uri)
+
+        val tempFile = File.createTempFile("delete_me_", ".pdf", context.cacheDir)
+        assertTrue(tempFile.exists())
+        assertTrue(PdfConverter.deletePdf(context, Uri.fromFile(tempFile)))
+        assertFalse(tempFile.exists())
+    }
+
+    @Test
+    fun pdfStorageFolder_formatsInitialUriAndTreeDisplayNamesCleanly() {
+        val initialUri = PdfStorageFolder.buildInitialFolderUri()
+        assertTrue(initialUri.toString().contains("Download%2FImageToPdf"))
+
+        val linked = "content://com.android.externalstorage.documents/tree/primary%3ADownload%2FImageToPdf".toUri()
+        assertEquals("Download/ImageToPdf", PdfStorageFolder.formatTreeUriDisplayName(linked))
     }
 
     private fun createTempJpeg(width: Int, height: Int, color: Int): File {

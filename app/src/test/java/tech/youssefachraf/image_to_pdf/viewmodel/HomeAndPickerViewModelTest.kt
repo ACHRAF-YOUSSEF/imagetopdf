@@ -104,6 +104,35 @@ class HomeAndPickerViewModelTest {
     }
 
     @Test
+    fun homeViewModel_persistsBannerDismissalAndMatchesFavoritesAcrossUriChanges() = runTest(testDispatcher) {
+        val prefsFile = File.createTempFile("storage_prefs_test_", ".preferences_pb", application.cacheDir)
+        val dataStore = PreferenceDataStoreFactory.create(scope = backgroundScope) { prefsFile }
+        val repo = FavoritesRepository(dataStore)
+        val vm = HomeViewModel(application, testDispatcher, repo)
+
+        assertFalse(vm.uiState.value.isFolderBannerDismissed)
+        vm.dismissFolderBanner()
+        assertTrue(vm.uiState.value.isFolderBannerDismissed)
+
+        val originalPdf = PdfFileInfo("content://media/external/downloads/10".toUri(), "Report.pdf", 3, 4096L, 100L)
+        vm.toggleFavorite(originalPdf.uri, originalPdf.name)
+        assertTrue(FavoritesRepository.isFavorite(originalPdf, vm.uiState.value.favoriteUris))
+
+        val rebuiltAppSafPdf = PdfFileInfo(
+            "content://com.android.externalstorage.documents/tree/primary%3ADownload%2FImageToPdf/document/Report.pdf".toUri(),
+            "Report.pdf",
+            3,
+            4096L,
+            100L,
+        )
+        assertTrue(FavoritesRepository.isFavorite(rebuiltAppSafPdf, vm.uiState.value.favoriteUris))
+
+        vm.toggleFavorite(rebuiltAppSafPdf.uri, rebuiltAppSafPdf.name)
+        assertFalse(FavoritesRepository.isFavorite(rebuiltAppSafPdf, vm.uiState.value.favoriteUris))
+        assertFalse(FavoritesRepository.isFavorite(originalPdf, vm.uiState.value.favoriteUris))
+    }
+
+    @Test
     fun pickerViewModel_selectionReorderAndPageSizeStateUpdates() {
         val vm = PickerViewModel(application, testDispatcher)
         val u1: Uri = "content://img/1".toUri()

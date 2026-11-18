@@ -17,7 +17,8 @@ An offline **PDF toolkit and image-to-PDF converter** built with Kotlin and Jetp
 - **Text to PDF:** Turn plain text notes or documents into paginated `A4` or `Letter` PDFs.
 - **Favorites, Search & Sort:** Star favorite PDFs (persisted with DataStore Preferences), filter by favorites, search in real time across files, and sort by date, name, or size.
 - **Share, Rename & Delete:** Open, share, rename, or delete PDFs safely using `MediaStore` and scoped `FileProvider` URIs across Home, Files, and Search views.
-- **Settings & Info:** View build details, app information, and source links.
+- **Settings & Info:** View build details, app information, persistent folder storage link controls, and source links.
+- **Persistent Folder Storage:** PDFs save to `Download/ImageToPdf` by default, and linking `Download/ImageToPdf` (from the Home card, Files toolbar, or Settings) preserves full access to previously generated PDFs across new APK builds, signing key changes, and reinstalls.
 - **Offline-First & Hardened:** Zero internet dependency (`android:usesCleartextTraffic="false"`), canonical file-path confinement, and R8 code minification and resource shrinking enabled for release builds.
 
 ---
@@ -100,6 +101,7 @@ tech.youssefachraf.image_to_pdf/
     ├── DocxToPdfConverter.kt
     ├── PdfConverter.kt
     ├── PdfPageCanvasWriter.kt
+    ├── PdfStorageFolder.kt
     ├── PdfThumbnailCache.kt
     └── PdfToolkit.kt
 ```

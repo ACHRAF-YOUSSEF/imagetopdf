@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,6 +22,8 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.LinkOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -54,10 +57,15 @@ import tech.youssefachraf.image_to_pdf.ui.theme.SecondaryText
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    linkedFolderLabel: String? = null,
+    onSelectStorageFolder: () -> Unit = {},
+    onDisconnectStorageFolder: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
 
     Scaffold(
+        modifier = modifier,
         containerColor = DarkBackground,
         topBar = {
             TopAppBar(
@@ -84,6 +92,45 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
+            Text(
+                "Storage",
+                style = MaterialTheme.typography.labelLarge,
+                color = SecondaryText,
+                modifier = Modifier.padding(bottom = 8.dp, start = 4.dp),
+            )
+
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkCard),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            ) {
+                Column {
+                    SettingsItem(
+                        icon = Icons.Outlined.FolderOpen,
+                        title = "PDF Storage Folder",
+                        subtitle = linkedFolderLabel ?: "Default (Download/ImageToPdf) - tap to keep across reinstalls",
+                        onClick = onSelectStorageFolder,
+                    )
+
+                    if (linkedFolderLabel != null && onDisconnectStorageFolder != null) {
+                        HorizontalDivider(
+                            color = DarkBackground,
+                            thickness = 1.dp,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+
+                        SettingsItem(
+                            icon = Icons.Outlined.LinkOff,
+                            title = "Disconnect Linked Folder",
+                            subtitle = "Use default Downloads folder only",
+                            onClick = onDisconnectStorageFolder,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             Text(
                 "About",
                 style = MaterialTheme.typography.labelLarge,

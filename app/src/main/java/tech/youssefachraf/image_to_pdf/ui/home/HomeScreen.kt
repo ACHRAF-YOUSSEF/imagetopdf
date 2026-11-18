@@ -53,6 +53,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import tech.youssefachraf.image_to_pdf.data.FavoritesRepository
+import tech.youssefachraf.image_to_pdf.ui.common.OpenPdfFolderTreeContract
+import tech.youssefachraf.image_to_pdf.ui.common.PersistentStorageBanner
 import tech.youssefachraf.image_to_pdf.ui.common.RenamePdfDialog
 import tech.youssefachraf.image_to_pdf.ui.common.openPdf
 import tech.youssefachraf.image_to_pdf.ui.common.sharePdf
@@ -67,6 +70,7 @@ import tech.youssefachraf.image_to_pdf.ui.theme.DarkBackground
 import tech.youssefachraf.image_to_pdf.ui.theme.DarkSurface
 import tech.youssefachraf.image_to_pdf.ui.theme.PrimaryText
 import tech.youssefachraf.image_to_pdf.ui.theme.SecondaryText
+import tech.youssefachraf.image_to_pdf.utils.PdfStorageFolder
 import tech.youssefachraf.image_to_pdf.viewmodel.HomeViewModel
 import tech.youssefachraf.image_to_pdf.viewmodel.PdfSortOrder
 import tech.youssefachraf.image_to_pdf.viewmodel.PickerViewModel
@@ -104,6 +108,14 @@ fun HomeScreen(
     ) { uris ->
         if (uris.isNotEmpty()) {
             homeViewModel.importPdfs(uris)
+        }
+    }
+
+    val folderLauncher = rememberLauncherForActivityResult(
+        OpenPdfFolderTreeContract()
+    ) { treeUri ->
+        if (treeUri != null) {
+            homeViewModel.onStorageFolderSelected(treeUri)
         }
     }
 
@@ -209,6 +221,20 @@ fun HomeScreen(
                 )
             }
 
+            if (uiState.linkedFolderUri == null && !uiState.isFolderBannerDismissed) {
+                item(key = "persistent_storage_banner", contentType = "storage_banner") {
+                    PersistentStorageBanner(
+                        onLinkFolder = {
+                            folderLauncher.launch(PdfStorageFolder.buildInitialFolderUri())
+                        },
+                        onImportPdfs = {
+                            importPdfLauncher.launch(arrayOf("application/pdf"))
+                        },
+                        onDismiss = homeViewModel::dismissFolderBanner,
+                    )
+                }
+            }
+
             item(key = "section_header", contentType = "section_header") {
                 Row(
                     modifier = Modifier
@@ -281,8 +307,8 @@ fun HomeScreen(
                     },
                     onDelete = { homeViewModel.deletePdf(pdf.uri) },
                     onOpen = { openPdf(context, pdf.uri) },
-                    isFavorite = pdf.uri.toString() in uiState.favoriteUris,
-                    onToggleFavorite = { homeViewModel.toggleFavorite(pdf.uri) },
+                    isFavorite = FavoritesRepository.isFavorite(pdf, uiState.favoriteUris),
+                    onToggleFavorite = { homeViewModel.toggleFavorite(pdf.uri, pdf.name) },
                     appContext = context,
                 )
             }

@@ -1,10 +1,14 @@
 package tech.youssefachraf.image_to_pdf.navigation
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import tech.youssefachraf.image_to_pdf.ui.common.OpenPdfFolderTreeContract
 import tech.youssefachraf.image_to_pdf.ui.files.FilesScreen
 import tech.youssefachraf.image_to_pdf.ui.home.HomeScreen
 import tech.youssefachraf.image_to_pdf.ui.picker.PreviewReorderScreen
@@ -18,6 +22,7 @@ import tech.youssefachraf.image_to_pdf.ui.tools.MergePdfScreen
 import tech.youssefachraf.image_to_pdf.ui.tools.PdfToJpgScreen
 import tech.youssefachraf.image_to_pdf.ui.tools.SplitPdfScreen
 import tech.youssefachraf.image_to_pdf.ui.tools.TextToPdfScreen
+import tech.youssefachraf.image_to_pdf.utils.PdfStorageFolder
 import tech.youssefachraf.image_to_pdf.viewmodel.HomeViewModel
 import tech.youssefachraf.image_to_pdf.viewmodel.PickerViewModel
 import tech.youssefachraf.image_to_pdf.viewmodel.ToolsViewModel
@@ -161,8 +166,25 @@ fun AppNavGraph(
         }
 
         composable(Routes.SETTINGS) {
+            val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
+            val folderLauncher = rememberLauncherForActivityResult(
+                OpenPdfFolderTreeContract()
+            ) { treeUri ->
+                if (treeUri != null) {
+                    homeViewModel.onStorageFolderSelected(treeUri)
+                }
+            }
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
+                linkedFolderLabel = uiState.linkedFolderLabel,
+                onSelectStorageFolder = {
+                    folderLauncher.launch(PdfStorageFolder.buildInitialFolderUri())
+                },
+                onDisconnectStorageFolder = if (uiState.linkedFolderUri != null) {
+                    { homeViewModel.disconnectStorageFolder() }
+                } else {
+                    null
+                },
             )
         }
     }

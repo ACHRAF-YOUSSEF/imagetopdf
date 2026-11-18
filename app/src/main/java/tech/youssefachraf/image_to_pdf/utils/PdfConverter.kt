@@ -14,8 +14,10 @@ import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import android.util.LruCache
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.CancellationException
 import java.io.File
@@ -41,6 +43,7 @@ data class PdfFileInfo(
 
 object PdfConverter {
     private const val MAX_IMAGE_DIMENSION = 1500
+    private const val PAGE_COUNT_CACHE_SIZE = 128
     internal const val A4_WIDTH = 595
     internal const val A4_HEIGHT = 842
     internal const val LETTER_WIDTH = 612
@@ -48,6 +51,7 @@ object PdfConverter {
     internal const val PDF_MIME_TYPE = "application/pdf"
     internal const val PDF_EXTENSION = ".pdf"
     private val INVALID_FILE_CHARS = Regex("[/\\\\:*?\"<>|\\x00-\\x1F]")
+    private val pageCountCache = LruCache<String, Int>(PAGE_COUNT_CACHE_SIZE)
 
     fun generateDefaultFileName(prefix: String = "document"): String {
         val sdf = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
@@ -90,6 +94,10 @@ object PdfConverter {
     }
 
     private fun fileExists(context: Context, fileName: String): Boolean {
+        val treeUri = PdfStorageFolder.getActiveTreeUri(context)
+        if (treeUri != null && PdfStorageFolder.findChildPdfUri(context, treeUri, fileName) != null) {
+            return true
+        }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val resolver = context.contentResolver
             val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
@@ -101,7 +109,9 @@ object PdfConverter {
             } ?: false
         } else {
             val downloadsDir = legacyPublicDownloadsDir()
-            resolveSafeChildFile(downloadsDir, fileName).exists()
+            val subDir = File(downloadsDir, PdfStorageFolder.SUBFOLDER_NAME)
+            resolveSafeChildFile(subDir, fileName).exists() ||
+                resolveSafeChildFile(downloadsDir, fileName).exists()
         }
     }
 
@@ -251,6 +261,19 @@ object PdfConverter {
         overwriteExisting: Boolean,
         writer: (java.io.OutputStream) -> Unit
     ): Uri {
+        val treeUri = PdfStorageFolder.getActiveTreeUri(context, requireWrite = true)
+        if (treeUri != null) {
+            val safUri = PdfStorageFolder.writePdfToTree(
+                context = context,
+                treeUri = treeUri,
+                normalizedName = normalizedName,
+                overwriteExisting = overwriteExisting,
+                writer = writer,
+            )
+            if (safUri != null) {
+                return safUri
+            }
+        }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             writePdfMediaStore(context, normalizedName, overwriteExisting, writer)
         } else {
@@ -273,6 +296,10 @@ object PdfConverter {
         val contentValues = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, normalizedName)
             put(MediaStore.Downloads.MIME_TYPE, PDF_MIME_TYPE)
+            put(
+                MediaStore.Downloads.RELATIVE_PATH,
+                "${Environment.DIRECTORY_DOWNLOADS}/${PdfStorageFolder.SUBFOLDER_NAME}/"
+            )
             put(MediaStore.Downloads.IS_PENDING, 1)
         }
         val itemUri = resolver.insert(collection, contentValues)
@@ -335,7 +362,7 @@ object PdfConverter {
         normalizedName: String,
         writer: (java.io.OutputStream) -> Unit
     ): Uri {
-        val downloadsDir = legacyPublicDownloadsDir()
+        val downloadsDir = File(legacyPublicDownloadsDir(), PdfStorageFolder.SUBFOLDER_NAME)
         if (!downloadsDir.exists()) {
             downloadsDir.mkdirs()
         }
@@ -353,63 +380,105 @@ object PdfConverter {
     }
 
     /**
-     * Query all PDFs from MediaStore Downloads (API 29+) or legacy Downloads folder.
+     * Query all PDFs from a linked SAF folder (persisting across reinstalls/key changes) merged
+     * with MediaStore Downloads (API 29+) or legacy Downloads folders.
      */
     fun queryAllPdfs(context: Context): List<PdfFileInfo> {
-        val pdfs = mutableListOf<PdfFileInfo>()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val resolver = context.contentResolver
-            val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-            val projection = arrayOf(
-                MediaStore.Downloads._ID,
-                MediaStore.Downloads.DISPLAY_NAME,
-                MediaStore.Downloads.SIZE,
-                MediaStore.Downloads.DATE_MODIFIED,
-            )
-            val selection = "${MediaStore.Downloads.MIME_TYPE} = ?"
-            val selectionArgs = arrayOf(PDF_MIME_TYPE)
-            val sortOrder = "${MediaStore.Downloads.DATE_MODIFIED} DESC"
+        val treePdfs = PdfStorageFolder.getActiveTreeUri(context)?.let { treeUri ->
+            PdfStorageFolder.queryTreePdfs(context, treeUri, ::resolveCachedPageCount)
+        }.orEmpty()
+        val systemPdfs = querySystemDownloadsPdfs(context)
+        return mergeAndDeduplicatePdfs(primary = treePdfs, secondary = systemPdfs)
+    }
 
-            resolver.query(collection, projection, selection, selectionArgs, sortOrder)?.use { cursor ->
-                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID)
-                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
-                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Downloads.SIZE)
-                val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DATE_MODIFIED)
-
-                while (cursor.moveToNext()) {
-                    val id = cursor.getLong(idCol)
-                    val name = cursor.getString(nameCol) ?: "Unknown"
-                    val size = cursor.getLong(sizeCol)
-                    val date = cursor.getLong(dateCol) * 1000
-
-                    val uri = ContentUris.withAppendedId(collection, id)
-                    val pageCount = getPdfPageCount(context, uri)
-                    pdfs.add(PdfFileInfo(uri, name, pageCount, size, date))
-                }
-            }
+    private fun querySystemDownloadsPdfs(context: Context): List<PdfFileInfo> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            queryMediaStoreDownloadsPdfs(context)
         } else {
-            val downloadsDir = legacyPublicDownloadsDir()
-            downloadsDir.listFiles()?.filter { it.extension.equals("pdf", ignoreCase = true) }
-                ?.sortedByDescending { it.lastModified() }
-                ?.forEach { file ->
-                    val uri = FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        file
-                    )
-                    val pageCount = getPdfPageCount(context, uri)
-                    pdfs.add(
-                        PdfFileInfo(
-                            uri = uri,
-                            name = file.name,
-                            pageCount = pageCount,
-                            sizeBytes = file.length(),
-                            dateModified = file.lastModified()
-                        )
-                    )
-                }
+            queryLegacyDownloadsPdfs(context)
+        }
+    }
+
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
+    private fun queryMediaStoreDownloadsPdfs(context: Context): List<PdfFileInfo> {
+        val pdfs = mutableListOf<PdfFileInfo>()
+        val resolver = context.contentResolver
+        val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val projection = arrayOf(
+            MediaStore.Downloads._ID,
+            MediaStore.Downloads.DISPLAY_NAME,
+            MediaStore.Downloads.SIZE,
+            MediaStore.Downloads.DATE_MODIFIED,
+        )
+        val selection = "${MediaStore.Downloads.MIME_TYPE} = ?"
+        val selectionArgs = arrayOf(PDF_MIME_TYPE)
+        val sortOrder = "${MediaStore.Downloads.DATE_MODIFIED} DESC"
+
+        resolver.query(collection, projection, selection, selectionArgs, sortOrder)?.use { cursor ->
+            val idCol = cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID)
+            val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
+            val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Downloads.SIZE)
+            val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DATE_MODIFIED)
+
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idCol)
+                val name = cursor.getString(nameCol) ?: "Unknown"
+                val size = cursor.getLong(sizeCol)
+                val date = cursor.getLong(dateCol) * 1000
+                val uri = ContentUris.withAppendedId(collection, id)
+                val pageCount = resolveCachedPageCount(context, uri, size, date)
+                pdfs.add(PdfFileInfo(uri, name, pageCount, size, date))
+            }
         }
         return pdfs
+    }
+
+    private fun queryLegacyDownloadsPdfs(context: Context): List<PdfFileInfo> {
+        val rootDir = legacyPublicDownloadsDir()
+        val subDir = File(rootDir, PdfStorageFolder.SUBFOLDER_NAME)
+        val files = (subDir.listFiles()?.toList().orEmpty() + rootDir.listFiles()?.toList().orEmpty())
+            .filter { it.isFile && it.extension.equals("pdf", ignoreCase = true) }
+            .distinctBy { it.canonicalPath }
+            .sortedByDescending { it.lastModified() }
+
+        return files.map { file ->
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val size = file.length()
+            val modified = file.lastModified()
+            val pageCount = resolveCachedPageCount(context, uri, size, modified)
+            PdfFileInfo(
+                uri = uri,
+                name = file.name,
+                pageCount = pageCount,
+                sizeBytes = size,
+                dateModified = modified
+            )
+        }
+    }
+
+    internal fun mergeAndDeduplicatePdfs(
+        primary: List<PdfFileInfo>,
+        secondary: List<PdfFileInfo>
+    ): List<PdfFileInfo> {
+        if (primary.isEmpty()) return secondary.sortedByDescending { it.dateModified }
+        if (secondary.isEmpty()) return primary.sortedByDescending { it.dateModified }
+
+        val seenUris = primary.mapTo(HashSet(primary.size)) { it.uri.toString() }
+        val seenSignatures = primary.mapTo(HashSet(primary.size)) {
+            it.name.lowercase(Locale.ROOT) to it.sizeBytes
+        }
+        val combined = ArrayList<PdfFileInfo>(primary.size + secondary.size)
+        combined.addAll(primary)
+        for (item in secondary) {
+            val uriKey = item.uri.toString()
+            val sigKey = item.name.lowercase(Locale.ROOT) to item.sizeBytes
+            if (uriKey !in seenUris && sigKey !in seenSignatures) {
+                seenUris.add(uriKey)
+                seenSignatures.add(sigKey)
+                combined.add(item)
+            }
+        }
+        return combined.sortedByDescending { it.dateModified }
     }
 
     internal fun querySinglePdfInfo(
@@ -476,6 +545,21 @@ object PdfConverter {
         }
     }
 
+    internal fun resolveCachedPageCount(
+        context: Context,
+        uri: Uri,
+        sizeBytes: Long,
+        dateModified: Long
+    ): Int {
+        val key = "$uri@$dateModified:$sizeBytes"
+        pageCountCache.get(key)?.let { return it }
+        val count = getPdfPageCount(context, uri)
+        if (count > 0) {
+            pageCountCache.put(key, count)
+        }
+        return count
+    }
+
     internal fun getPdfPageCount(context: Context, uri: Uri): Int {
         return try {
             context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
@@ -490,7 +574,13 @@ object PdfConverter {
 
     fun deletePdf(context: Context, uri: Uri): Boolean {
         return try {
-            val deleted = context.contentResolver.delete(uri, null, null) > 0
+            val deleted = when {
+                DocumentsContract.isDocumentUri(context, uri) ->
+                    DocumentsContract.deleteDocument(context.contentResolver, uri)
+                uri.scheme == ContentResolver.SCHEME_FILE ->
+                    uri.path?.let { File(it).delete() } == true
+                else -> context.contentResolver.delete(uri, null, null) > 0
+            }
             if (deleted) {
                 PdfThumbnailCache.invalidateUri(uri)
             }
@@ -503,10 +593,18 @@ object PdfConverter {
     fun renamePdf(context: Context, uri: Uri, newName: String): Boolean {
         val normalizedName = ensurePdfExtension(newName)
         return try {
-            val values = ContentValues().apply {
-                put(MediaStore.Downloads.DISPLAY_NAME, normalizedName)
+            val renamed = if (DocumentsContract.isDocumentUri(context, uri)) {
+                DocumentsContract.renameDocument(context.contentResolver, uri, normalizedName) != null
+            } else {
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, normalizedName)
+                }
+                context.contentResolver.update(uri, values, null, null) > 0
             }
-            context.contentResolver.update(uri, values, null, null) > 0
+            if (renamed) {
+                PdfThumbnailCache.invalidateUri(uri)
+            }
+            renamed
         } catch (_: Exception) {
             false
         }
