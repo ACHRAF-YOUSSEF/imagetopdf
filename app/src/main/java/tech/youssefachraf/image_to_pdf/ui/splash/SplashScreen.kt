@@ -2,7 +2,6 @@ package tech.youssefachraf.image_to_pdf.ui.splash
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,11 +23,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -71,7 +70,7 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.alpha(alpha)
+            modifier = Modifier.graphicsLayer { this.alpha = alpha }
         ) {
             DocumentIcon()
 
@@ -116,53 +115,48 @@ fun SplashScreen(onSplashComplete: () -> Unit) {
 
 @Composable
 private fun DocumentIcon() {
-    Canvas(modifier = Modifier.size(100.dp)) {
-        drawDocumentWithFoldedCorner(this)
-    }
+    Box(
+        modifier = Modifier
+            .size(100.dp)
+            .drawWithCache {
+                val w = size.width
+                val h = size.height
+                val foldSize = w * 0.25f
+                val cornerRadius = w * 0.06f
+
+                val bodyPath = Path().apply {
+                    moveTo(cornerRadius, 0f)
+                    lineTo(w - foldSize, 0f)
+                    lineTo(w, foldSize)
+                    lineTo(w, h - cornerRadius)
+                    quadraticTo(w, h, w - cornerRadius, h)
+                    lineTo(cornerRadius, h)
+                    quadraticTo(0f, h, 0f, h - cornerRadius)
+                    lineTo(0f, cornerRadius)
+                    quadraticTo(0f, 0f, cornerRadius, 0f)
+                    close()
+                }
+                val foldPath = Path().apply {
+                    moveTo(w - foldSize, 0f)
+                    lineTo(w - foldSize, foldSize)
+                    lineTo(w, foldSize)
+                    close()
+                }
+                val foldColor = Color(0xFFC0392B)
+                val textPaint = android.graphics.Paint().apply {
+                    color = android.graphics.Color.WHITE
+                    textSize = w * 0.28f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    textAlign = android.graphics.Paint.Align.CENTER
+                    isAntiAlias = true
+                }
+                val textY = h / 2f + textPaint.textSize / 3f
+
+                onDrawBehind {
+                    drawPath(bodyPath, PdfBadgeRed)
+                    drawPath(foldPath, foldColor)
+                    drawContext.canvas.nativeCanvas.drawText("PDF", w / 2f, textY, textPaint)
+                }
+            }
+    )
 }
-
-private fun drawDocumentWithFoldedCorner(drawScope: DrawScope) {
-    with(drawScope) {
-        val w = size.width
-        val h = size.height
-        val foldSize = w * 0.25f
-        val cornerRadius = w * 0.06f
-
-        val bodyPath = Path().apply {
-            moveTo(cornerRadius, 0f)
-            lineTo(w - foldSize, 0f)
-            lineTo(w, foldSize)
-            lineTo(w, h - cornerRadius)
-            quadraticTo(w, h, w - cornerRadius, h)
-            lineTo(cornerRadius, h)
-            quadraticTo(0f, h, 0f, h - cornerRadius)
-            lineTo(0f, cornerRadius)
-            quadraticTo(0f, 0f, cornerRadius, 0f)
-            close()
-        }
-        drawPath(bodyPath, PdfBadgeRed)
-
-        val foldPath = Path().apply {
-            moveTo(w - foldSize, 0f)
-            lineTo(w - foldSize, foldSize)
-            lineTo(w, foldSize)
-            close()
-        }
-        drawPath(foldPath, Color(0xFFC0392B))
-
-        val textPaint = android.graphics.Paint().apply {
-            color = android.graphics.Color.WHITE
-            textSize = w * 0.28f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            textAlign = android.graphics.Paint.Align.CENTER
-            isAntiAlias = true
-        }
-        drawContext.canvas.nativeCanvas.drawText(
-            "PDF",
-            w / 2f,
-            h / 2f + textPaint.textSize / 3f,
-            textPaint
-        )
-    }
-}
-

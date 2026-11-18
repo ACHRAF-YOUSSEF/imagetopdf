@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,17 +49,24 @@ data class PickerUiState(
     val selectedAlbumId: Long? = null,
     val isGalleryLoading: Boolean = false,
     val selectedImages: List<Uri> = emptyList(),
+    val pageSize: PageSize = PageSize.A4,
     val pdfName: String = "",
     val showNameDialog: Boolean = false,
     val pickerState: PickerState = PickerState.Idle,
 )
 
-class PickerViewModel(application: Application) : AndroidViewModel(application) {
+class PickerViewModel(
+    application: Application,
+    private val ioDispatcher: CoroutineDispatcher,
+) : AndroidViewModel(application) {
+
+    constructor(application: Application) : this(application, Dispatchers.IO)
+
     private val _uiState = MutableStateFlow(PickerUiState())
     val uiState: StateFlow<PickerUiState> = _uiState.asStateFlow()
 
     fun loadGalleryImages() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(isGalleryLoading = true) }
             try {
                 val resolver = getApplication<Application>().contentResolver
@@ -116,6 +124,8 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
                         isGalleryLoading = false
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 _uiState.update { it.copy(isGalleryLoading = false) }
             }
@@ -153,6 +163,20 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun setScannedImages(uris: List<Uri>) {
+        _uiState.update {
+            it.copy(
+                selectedImages = uris,
+                pickerState = PickerState.Idle,
+                showNameDialog = false
+            )
+        }
+    }
+
+    fun setPageSize(pageSize: PageSize) {
+        _uiState.update { it.copy(pageSize = pageSize) }
+    }
+
     fun removeImage(uri: Uri) {
         _uiState.update { state ->
             state.copy(selectedImages = state.selectedImages.filter { it != uri })
@@ -185,8 +209,13 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun generatePdf(finalName: String? = null) {
         val context = getApplication<Application>()
-        val name = finalName ?: _uiState.value.pdfName.trim()
+        val name = (finalName ?: _uiState.value.pdfName).trim()
         if (name.isBlank()) return
+
+        val currentPickerState = _uiState.value.pickerState
+        val overwrite = finalName != null &&
+            currentPickerState is PickerState.FileConflict &&
+            finalName == currentPickerState.originalName
 
         if (finalName == null) {
             val (exists, suggested) = PdfConverter.resolveFileName(context, name)
@@ -203,26 +232,27 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
 
         val images = _uiState.value.selectedImages
         if (images.isEmpty()) return
+        val chosenPageSize = _uiState.value.pageSize
 
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             _uiState.update { it.copy(showNameDialog = false, pickerState = PickerState.Converting) }
             try {
                 val resultUri = PdfConverter.convert(
                     context = context,
                     uris = images,
-                    pageSize = PageSize.A4,
-                    fileName = name
+                    pageSize = chosenPageSize,
+                    fileName = name,
+                    overwriteExisting = overwrite
                 )
-                val allPdfs = PdfConverter.queryAllPdfs(context)
-                val newPdf = allPdfs.firstOrNull { it.uri == resultUri }
-                    ?: PdfFileInfo(
-                        uri = resultUri,
-                        name = "$name.pdf",
-                        pageCount = images.size,
-                        sizeBytes = 0L,
-                        dateModified = System.currentTimeMillis()
-                    )
+                val newPdf = PdfConverter.querySinglePdfInfo(
+                    context = context,
+                    uri = resultUri,
+                    fallbackName = PdfConverter.ensurePdfExtension(name),
+                    fallbackPageCount = images.size
+                )
                 _uiState.update { it.copy(pickerState = PickerState.Success(newPdf)) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(pickerState = PickerState.Error(e.message ?: "Unknown error"))

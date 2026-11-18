@@ -3,5 +3,11 @@
     <external-path
         name="external_downloads"
         path="Download/" />
+    <cache-path
+        name="scan_cache"
+        path="scans/" />
+    <external-path
+        name="external_pictures"
+        path="Pictures/ImageToPdf/" />
 </paths>
 

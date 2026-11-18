@@ -1,20 +1,23 @@
 # 📄 Image to PDF Converter (Jetpack Compose)
 
-A sleek, offline **image-to-PDF converter** built entirely with Kotlin and Jetpack Compose. Featuring a polished **dark-themed UI with blue accents**, the app lets you pick images, reorder pages with drag-and-drop, preview them full-screen, and generate perfectly formatted A4 PDFs — all saved straight to your Downloads folder.
+A sleek, offline **PDF toolkit & image-to-PDF converter** built entirely with Kotlin and Jetpack Compose. Featuring a polished **dark-themed UI with blue accents**, the app lets you convert images, scan documents with CameraX, compress, merge, split, and export PDFs, and convert DOCX or plain text — all saved locally on your device.
 
 ---
 
 ## ✨ Features
 
-- **🖼️ Image to PDF:** Select multiple images from your gallery and convert them into a single, clean PDF document.
-- **🔀 Drag & Drop Reorder:** A dedicated preview screen lets you rearrange pages before generating — drag the handles.
-- **🔍 Full-Screen Preview:** Tap any image in the reorder list to view it full-screen with pinch-to-zoom.
-- **📝 Custom Naming:** Name your PDF before saving, with smart conflict resolution (overwrite or auto-increment).
-- **📂 Recent PDFs:** Browse all your generated PDFs with thumbnail previews, page counts, dates, and file sizes.
-- **🔎 Search & Filter:** Instantly find any PDF by name with real-time search.
-- **📤 Share & Manage:** Share, rename, delete, or open any PDF directly from the app.
-- **⚙️ Settings:** View build info, about page, and links to the source code.
-- **🚀 Offline-First:** No internet required — everything runs locally on your device.
+- **🖼️ Image to PDF & Reorder:** Pick multiple images, preview full-screen with pinch-to-zoom, drag to reorder pages, select `A4`, `Letter`, or `Fit Image` page sizes, and save with custom naming and overwrite/increment conflict handling.
+- **📷 Smart Scan (CameraX):** Capture document pages with flash/lens toggles, A4 alignment overlay, gallery fallback, and local image filters (`Original`, `Magic Contrast`, `Crisp B&W`) with EXIF rotation correction.
+- **📥 Import PDF:** Bring existing PDF files into your workspace via the document picker and view them immediately in Recent PDFs.
+- **🗜️ Compress PDF:** Shrink PDF file sizes locally across three quality presets (`Low`, `Balanced`, `Extreme`) with byte-savings reporting.
+- **🧩 Merge PDF:** Combine multiple PDFs in custom drag-and-drop order.
+- **✂️ Split & Extract PDF:** Select page thumbnails or enter page range expressions (e.g., `1-3, 5`) to extract or split pages into individual or single PDFs.
+- **🖼️ PDF to JPG:** Export selected or all PDF pages to `Pictures/ImageToPdf` in `Standard` or `HD` resolution and share directly.
+- **📝 DOCX to PDF & Text to PDF:** Convert Word `.docx` files (headings, paragraphs, lists, tables, embedded images) and plain text notes into paginated A4/Letter PDFs completely offline.
+- **⭐ Favorites, Search & Sort:** Star favorite PDFs (persisted with DataStore Preferences), search in real time, and sort by date, name, or size.
+- **📤 Share, Rename & Delete:** Open, share, rename, or remove documents safely via `FileProvider` and `MediaStore`.
+- **⚙️ Settings & Info:** View build info, app details, and source links.
+- **🚀 Offline-First:** Zero internet requirement (`usesCleartextTraffic="false"`) — all document processing runs locally on your device.
 
 ---
 
@@ -22,15 +25,13 @@ A sleek, offline **image-to-PDF converter** built entirely with Kotlin and Jetpa
 
 - **Language:** [Kotlin](https://kotlinlang.org/)
 - **UI Framework:** [Jetpack Compose](https://developer.android.com/jetpack/compose) + [Material 3](https://m3.material.io/)
-- **PDF Generation:** [PdfDocument API](https://developer.android.com/reference/android/graphics/pdf/PdfDocument)
-- **PDF Thumbnails:** [PdfRenderer](https://developer.android.com/reference/android/graphics/pdf/PdfRenderer)
-- **Image Loading:** [Coil](https://coil-kt.github.io/coil/) (`AsyncImage`)
-- **Drag & Drop:** [Reorderable](https://github.com/Calvin-LL/Reorderable) (LazyList)
-- **State Management:** [StateFlow](https://developer.android.com/kotlin/flow/stateflow-and-sharedflow) & ViewModel
-- **Architecture:** MVVM (Model-View-ViewModel)
-- **Navigation:** [Navigation Compose](https://developer.android.com/jetpack/compose/navigation)
-- **Storage:** [MediaStore](https://developer.android.com/reference/android/provider/MediaStore) (Android 10+) / Downloads directory (older)
-- **Min SDK:** 26 · **Target SDK:** 34
+- **Camera & Enhancement:** [CameraX](https://developer.android.com/training/camerax) + [AndroidX ExifInterface](https://developer.android.com/jetpack/androidx/releases/exifinterface)
+- **PDF Generation & Rendering:** [PdfDocument](https://developer.android.com/reference/android/graphics/pdf/PdfDocument) & [PdfRenderer](https://developer.android.com/reference/android/graphics/pdf/PdfRenderer)
+- **DOCX Parsing:** [XmlPullParser](https://developer.android.com/reference/org/xmlpull/v1/XmlPullParser) + `ZipInputStream` + `StaticLayout` (offline, zero heavy JVM dependencies)
+- **Persistence & Media:** [DataStore Preferences](https://developer.android.com/topic/libraries/architecture/datastore), [MediaStore](https://developer.android.com/reference/android/provider/MediaStore) (Android 10+), `FileProvider`
+- **Image Loading & Drag-and-Drop:** [Coil](https://coil-kt.github.io/coil/) & [Reorderable](https://github.com/Calvin-LL/Reorderable)
+- **Architecture & Navigation:** MVVM (`StateFlow` + `ViewModel`) & [Navigation Compose](https://developer.android.com/jetpack/compose/navigation)
+- **Min SDK:** 26 · **Target SDK:** 35
 
 ---
 
@@ -55,30 +56,50 @@ Dark-only theme with clean sans-serif typography.
 ```
 tech.youssefachraf.image_to_pdf/
 ├── MainActivity.kt
+├── data/
+│   └── FavoritesRepository.kt
 ├── navigation/
 │   └── AppNavGraph.kt
 ├── ui/
+│   ├── common/
+│   │   ├── PdfIntentActions.kt
+│   │   └── ToolUiComponents.kt
 │   ├── splash/SplashScreen.kt
 │   ├── home/
 │   │   ├── HomeScreen.kt
 │   │   └── components/
-│   │       ├── ToolGrid.kt
-│   │       └── PdfCard.kt
+│   │       ├── MoreToolsSheet.kt
+│   │       ├── PdfCard.kt
+│   │       └── ToolGrid.kt
 │   ├── files/FilesScreen.kt
 │   ├── search/SearchScreen.kt
 │   ├── settings/SettingsScreen.kt
+│   ├── scan/SmartScanScreen.kt
 │   ├── picker/
 │   │   ├── ImagePickerSheet.kt
 │   │   └── PreviewReorderScreen.kt
+│   ├── tools/
+│   │   ├── CompressPdfScreen.kt
+│   │   ├── DocxToPdfScreen.kt
+│   │   ├── MergePdfScreen.kt
+│   │   ├── PdfToJpgScreen.kt
+│   │   ├── SplitPdfScreen.kt
+│   │   └── TextToPdfScreen.kt
 │   └── theme/
 │       ├── Color.kt
 │       ├── Theme.kt
 │       └── Type.kt
 ├── viewmodel/
-│   ├── HomeViewModel.kt
-│   └── PickerViewModel.kt
+│   ├── MainViewModel.kt
+│   ├── PickerViewModel.kt
+│   └── ToolsViewModel.kt
 └── utils/
-    └── PdfConverter.kt
+    ├── DocumentEnhancer.kt
+    ├── DocxToPdfConverter.kt
+    ├── PdfConverter.kt
+    ├── PdfPageCanvasWriter.kt
+    ├── PdfThumbnailCache.kt
+    └── PdfToolkit.kt
 ```
 
 ---

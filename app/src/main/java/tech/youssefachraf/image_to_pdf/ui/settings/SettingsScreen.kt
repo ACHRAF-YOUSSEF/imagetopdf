@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -37,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
@@ -44,6 +46,7 @@ import tech.youssefachraf.image_to_pdf.BuildConfig
 import tech.youssefachraf.image_to_pdf.ui.theme.AccentBlue
 import tech.youssefachraf.image_to_pdf.ui.theme.DarkBackground
 import tech.youssefachraf.image_to_pdf.ui.theme.DarkCard
+import tech.youssefachraf.image_to_pdf.ui.theme.ImagetopdfTheme
 import tech.youssefachraf.image_to_pdf.ui.theme.PrimaryText
 import tech.youssefachraf.image_to_pdf.ui.theme.SecondaryText
 
@@ -77,6 +80,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .consumeWindowInsets(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
@@ -204,6 +208,14 @@ private fun SettingsItem(
                 modifier = Modifier.size(20.dp),
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SettingsScreenPreview() {
+    ImagetopdfTheme {
+        SettingsScreen(onNavigateBack = {})
     }
 }
 

@@ -1,12 +1,13 @@
 package tech.youssefachraf.image_to_pdf.ui.search
 
-import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,6 +37,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import tech.youssefachraf.image_to_pdf.ui.common.RenamePdfDialog
+import tech.youssefachraf.image_to_pdf.ui.common.openPdf
+import tech.youssefachraf.image_to_pdf.ui.common.sharePdf
 import tech.youssefachraf.image_to_pdf.ui.home.components.PdfCard
 import tech.youssefachraf.image_to_pdf.ui.theme.AccentBlue
 import tech.youssefachraf.image_to_pdf.ui.theme.DarkBackground
@@ -55,11 +59,16 @@ fun SearchScreen(
     var query by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
 
-    val filtered = if (query.isBlank()) {
-        uiState.recentPdfs
-    } else {
-        uiState.recentPdfs.filter {
-            it.name.contains(query, ignoreCase = true)
+    var renameTarget by remember { mutableStateOf<Pair<Uri, String>?>(null) }
+    var renameText by remember { mutableStateOf("") }
+
+    val filtered = remember(uiState.recentPdfs, query) {
+        if (query.isBlank()) {
+            uiState.recentPdfs
+        } else {
+            uiState.recentPdfs.filter {
+                it.name.contains(query, ignoreCase = true)
+            }
         }
     }
 
@@ -111,7 +120,9 @@ fun SearchScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
+                    .padding(paddingValues)
+                    .consumeWindowInsets(paddingValues)
+                    .imePadding(),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -124,42 +135,46 @@ fun SearchScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
+                    .consumeWindowInsets(paddingValues)
+                    .imePadding(),
+                contentPadding = paddingValues,
             ) {
-                items(filtered, key = { it.uri.toString() }) { pdf ->
+                items(
+                    items = filtered,
+                    key = { it.uri.toString() },
+                    contentType = { "pdf_card" },
+                ) { pdf ->
                     PdfCard(
                         pdfInfo = pdf,
                         onClick = { openPdf(context, pdf.uri) },
                         onShare = { sharePdf(context, pdf.uri) },
-                        onRename = { },
+                        onRename = {
+                            renameText = pdf.name.removeSuffix(".pdf")
+                            renameTarget = Pair(pdf.uri, pdf.name)
+                        },
                         onDelete = { homeViewModel.deletePdf(pdf.uri) },
                         onOpen = { openPdf(context, pdf.uri) },
+                        isFavorite = pdf.uri.toString() in uiState.favoriteUris,
+                        onToggleFavorite = { homeViewModel.toggleFavorite(pdf.uri) },
+                        appContext = context,
                     )
                 }
-                item { Spacer(modifier = Modifier.height(16.dp)) }
+                item(key = "search_bottom_spacer", contentType = "spacer") {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
             }
         }
     }
-}
 
-private fun openPdf(context: android.content.Context, uri: Uri) {
-    try {
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/pdf")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        context.startActivity(intent)
-    } catch (_: Exception) {
-        // Handle the exception if the PDF viewer is not installed
+    renameTarget?.let { (uri, _) ->
+        RenamePdfDialog(
+            name = renameText,
+            onNameChange = { renameText = it },
+            onConfirm = {
+                homeViewModel.renamePdf(uri, renameText)
+                renameTarget = null
+            },
+            onDismiss = { renameTarget = null },
+        )
     }
 }
-
-private fun sharePdf(context: android.content.Context, uri: Uri) {
-    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-        type = "application/pdf"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    context.startActivity(Intent.createChooser(shareIntent, null))
-}
-

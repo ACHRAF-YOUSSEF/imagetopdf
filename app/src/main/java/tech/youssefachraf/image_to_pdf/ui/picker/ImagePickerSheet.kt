@@ -64,7 +64,6 @@ import tech.youssefachraf.image_to_pdf.ui.theme.AccentBlue
 import tech.youssefachraf.image_to_pdf.ui.theme.DarkCard
 import tech.youssefachraf.image_to_pdf.ui.theme.PrimaryText
 import tech.youssefachraf.image_to_pdf.ui.theme.SecondaryText
-import tech.youssefachraf.image_to_pdf.viewmodel.PickerState
 import tech.youssefachraf.image_to_pdf.viewmodel.PickerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -181,12 +180,19 @@ fun ImagePickerSheet(
                 Spacer(Modifier.height(8.dp))
             }
 
-            val visibleImages = uiState.selectedAlbumId?.let { albumId ->
-                uiState.galleryImages.filter { it.albumId == albumId }
-            } ?: uiState.galleryImages
+            val visibleImages = remember(uiState.galleryImages, uiState.selectedAlbumId) {
+                uiState.selectedAlbumId?.let { albumId ->
+                    uiState.galleryImages.filter { it.albumId == albumId }
+                } ?: uiState.galleryImages
+            }
 
-            val allVisibleSelected = visibleImages.isNotEmpty() &&
-                visibleImages.all { it.uri in uiState.selectedImages }
+            val selectedSet = remember(uiState.selectedImages) {
+                uiState.selectedImages.toHashSet()
+            }
+
+            val allVisibleSelected = remember(visibleImages, selectedSet) {
+                visibleImages.isNotEmpty() && visibleImages.all { it.uri in selectedSet }
+            }
 
             Text(
                 "Long-press and drag across photos to select multiple.",
@@ -279,8 +285,12 @@ fun ImagePickerSheet(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        items(visibleImages, key = { it.uri.toString() }) { image ->
-                            val selected = image.uri in uiState.selectedImages
+                        items(
+                            items = visibleImages,
+                            key = { it.uri.toString() },
+                            contentType = { "gallery_image_tile" },
+                        ) { image ->
+                            val selected = image.uri in selectedSet
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()

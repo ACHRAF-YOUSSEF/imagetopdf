@@ -1,7 +1,7 @@
 package tech.youssefachraf.image_to_pdf.ui.home.components
 
+import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -32,9 +34,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,21 +48,21 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import androidx.core.net.toUri
+import tech.youssefachraf.image_to_pdf.ui.common.formatFileSize
+import tech.youssefachraf.image_to_pdf.ui.common.formatPdfDate
 import tech.youssefachraf.image_to_pdf.ui.theme.AccentBlue
+import tech.youssefachraf.image_to_pdf.ui.theme.DarkBackground
 import tech.youssefachraf.image_to_pdf.ui.theme.DarkCard
+import tech.youssefachraf.image_to_pdf.ui.theme.ImagetopdfTheme
 import tech.youssefachraf.image_to_pdf.ui.theme.PdfBadgeRed
 import tech.youssefachraf.image_to_pdf.ui.theme.PrimaryText
 import tech.youssefachraf.image_to_pdf.ui.theme.SecondaryText
 import tech.youssefachraf.image_to_pdf.utils.PdfFileInfo
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import androidx.core.graphics.createBitmap
-import kotlinx.coroutines.CoroutineDispatcher
+import tech.youssefachraf.image_to_pdf.utils.PdfThumbnailCache
 
 @Composable
 fun PdfCard(
@@ -70,6 +72,9 @@ fun PdfCard(
     onRename: () -> Unit,
     onDelete: () -> Unit,
     onOpen: () -> Unit,
+    isFavorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null,
+    appContext: Context = LocalContext.current,
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -88,7 +93,7 @@ fun PdfCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PdfThumbnail(uri = pdfInfo.uri)
+            PdfThumbnail(context = appContext, uri = pdfInfo.uri)
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -123,15 +128,26 @@ fun PdfCard(
                     }
 
                     Text(
-                        text = formatDate(pdfInfo.dateModified),
+                        text = formatPdfDate(pdfInfo.dateModified),
                         color = SecondaryText,
                         fontSize = 12.sp,
                     )
 
                     Text(
-                        text = formatSize(pdfInfo.sizeBytes),
+                        text = formatFileSize(pdfInfo.sizeBytes),
                         color = SecondaryText,
                         fontSize = 12.sp,
+                    )
+                }
+            }
+
+            if (onToggleFavorite != null) {
+                IconButton(onClick = onToggleFavorite) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                        contentDescription = if (isFavorite) "Remove favorite" else "Add favorite",
+                        tint = if (isFavorite) Color(0xFFD29922) else SecondaryText,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
@@ -159,14 +175,27 @@ fun PdfCard(
                     onDismissRequest = { showMenu = false },
                 ) {
                     DropdownMenuItem(
+                        text = { Text("Open") },
+                        onClick = { showMenu = false; onOpen() },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, null) }
+                    )
+                    if (onToggleFavorite != null) {
+                        DropdownMenuItem(
+                            text = { Text(if (isFavorite) "Unfavorite" else "Favorite") },
+                            onClick = { showMenu = false; onToggleFavorite() },
+                            leadingIcon = {
+                                Icon(
+                                    if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                                    null,
+                                    tint = if (isFavorite) Color(0xFFD29922) else PrimaryText
+                                )
+                            }
+                        )
+                    }
+                    DropdownMenuItem(
                         text = { Text("Rename") },
                         onClick = { showMenu = false; onRename() },
                         leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, null) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Delete") },
-                        onClick = { showMenu = false; onDelete() },
-                        leadingIcon = { Icon(Icons.Default.Delete, null, tint = PdfBadgeRed) }
                     )
                     DropdownMenuItem(
                         text = { Text("Share") },
@@ -174,9 +203,9 @@ fun PdfCard(
                         leadingIcon = { Icon(Icons.Default.Share, null) }
                     )
                     DropdownMenuItem(
-                        text = { Text("Open") },
-                        onClick = { showMenu = false; onOpen() },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, null) }
+                        text = { Text("Delete") },
+                        onClick = { showMenu = false; onDelete() },
+                        leadingIcon = { Icon(Icons.Default.Delete, null, tint = PdfBadgeRed) }
                     )
                 }
             }
@@ -185,31 +214,9 @@ fun PdfCard(
 }
 
 @Composable
-private fun PdfThumbnail(uri: Uri) {
-    val context = LocalContext.current
-    var thumbnail by remember(uri) { mutableStateOf<Bitmap?>(null) }
-
-    LaunchedEffect(uri) {
-        thumbnail = withContext(Dispatchers.IO) {
-            try {
-                context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                    val renderer = PdfRenderer(pfd)
-                    if (renderer.pageCount > 0) {
-                        val page = renderer.openPage(0)
-                        val bmp = createBitmap(page.width * 2, page.height * 2)
-                        page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        page.close()
-                        renderer.close()
-                        bmp
-                    } else {
-                        renderer.close()
-                        null
-                    }
-                }
-            } catch (_: Exception) {
-                null
-            }
-        }
+private fun PdfThumbnail(context: Context, uri: Uri) {
+    val thumbnail by produceState<Bitmap?>(initialValue = null, uri) {
+        value = PdfThumbnailCache.loadPageThumbnail(context, uri, pageIndex = 0, maxDimensionPx = 240)
     }
 
     Box(
@@ -229,7 +236,6 @@ private fun PdfThumbnail(uri: Uri) {
             )
         }
 
-        // PDF badge overlay
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -247,16 +253,27 @@ private fun PdfThumbnail(uri: Uri) {
     }
 }
 
-private fun formatDate(millis: Long): String {
-    val sdf = SimpleDateFormat("MM/dd HH:mm", Locale.US)
-    return sdf.format(Date(millis))
-}
-
-private fun formatSize(bytes: Long): String {
-    return when {
-        bytes >= 1_000_000 -> String.format(Locale.US, "%.1f MB", bytes / 1_000_000.0)
-        bytes >= 1_000 -> String.format(Locale.US, "%d kB", bytes / 1_000)
-        else -> "$bytes B"
+@Preview(showBackground = true)
+@Composable
+private fun PdfCardPreview() {
+    ImagetopdfTheme {
+        Box(modifier = Modifier.background(DarkBackground).padding(vertical = 8.dp)) {
+            PdfCard(
+                pdfInfo = PdfFileInfo(
+                    uri = "content://downloads/1".toUri(),
+                    name = "Scanned_Invoice_2026.pdf",
+                    pageCount = 4,
+                    sizeBytes = 1_450_000L,
+                    dateModified = 1_763_400_000_000L,
+                ),
+                onClick = {},
+                onShare = {},
+                onRename = {},
+                onDelete = {},
+                onOpen = {},
+                isFavorite = true,
+                onToggleFavorite = {},
+            )
+        }
     }
 }
-

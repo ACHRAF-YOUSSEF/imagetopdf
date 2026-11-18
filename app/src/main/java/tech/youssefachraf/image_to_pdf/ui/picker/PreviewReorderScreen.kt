@@ -12,12 +12,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -64,6 +67,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import tech.youssefachraf.image_to_pdf.ui.common.PageSizeSelectorRow
 import tech.youssefachraf.image_to_pdf.ui.theme.AccentBlue
 import tech.youssefachraf.image_to_pdf.ui.theme.DarkBackground
 import tech.youssefachraf.image_to_pdf.ui.theme.DarkCard
@@ -182,11 +186,17 @@ fun PreviewReorderScreen(
                         color = AccentBlue,
                     )
                 }
+                PageSizeSelectorRow(
+                    selectedSize = uiState.pageSize,
+                    includeAuto = true,
+                    onSelect = pickerViewModel::setPageSize,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
                 Button(
                     onClick = pickerViewModel::showNameDialog,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     enabled = images.isNotEmpty() && pickerState !is PickerState.Converting,
                     colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
                     shape = RoundedCornerShape(12.dp),
@@ -211,7 +221,10 @@ fun PreviewReorderScreen(
 
         if (images.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .consumeWindowInsets(paddingValues),
                 contentAlignment = Alignment.Center,
             ) {
                 Text("No images. Go back to pick some.", color = SecondaryText, fontSize = 14.sp)
@@ -221,12 +234,16 @@ fun PreviewReorderScreen(
                 state = lazyListState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
+                    .padding(paddingValues)
+                    .consumeWindowInsets(paddingValues),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(images.size, key = { images[it].toString() }) { index ->
-                    val uri = images[index]
+                itemsIndexed(
+                    items = images,
+                    key = { _, uri -> uri.toString() },
+                    contentType = { _, _ -> "reorder_image_card" },
+                ) { index, uri ->
                     ReorderableItem(reorderableState, key = uri.toString()) { isDragging ->
                         val elevation by animateDpAsState(
                             targetValue = if (isDragging) 8.dp else 1.dp,
@@ -313,12 +330,16 @@ private fun FullscreenImagePreview(
 
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.95f))
+                .safeDrawingPadding()
                 .pointerInput(Unit) { detectTapGestures { onDismiss() } },
             contentAlignment = Alignment.Center,
         ) {

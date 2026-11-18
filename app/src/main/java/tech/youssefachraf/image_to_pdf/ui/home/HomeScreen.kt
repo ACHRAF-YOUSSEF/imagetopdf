@@ -1,12 +1,11 @@
 package tech.youssefachraf.image_to_pdf.ui.home
 
-import android.content.ContentValues.TAG
-import android.content.Intent
-import android.net.Uri
-import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,30 +17,31 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -53,16 +53,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import tech.youssefachraf.image_to_pdf.ui.common.RenamePdfDialog
+import tech.youssefachraf.image_to_pdf.ui.common.openPdf
+import tech.youssefachraf.image_to_pdf.ui.common.sharePdf
+import tech.youssefachraf.image_to_pdf.ui.home.components.ExtraToolAction
+import tech.youssefachraf.image_to_pdf.ui.home.components.MoreToolsSheet
 import tech.youssefachraf.image_to_pdf.ui.home.components.PdfCard
+import tech.youssefachraf.image_to_pdf.ui.home.components.ToolAction
 import tech.youssefachraf.image_to_pdf.ui.home.components.ToolGrid
 import tech.youssefachraf.image_to_pdf.ui.picker.ImagePickerSheet
 import tech.youssefachraf.image_to_pdf.ui.theme.AccentBlue
 import tech.youssefachraf.image_to_pdf.ui.theme.DarkBackground
-import tech.youssefachraf.image_to_pdf.ui.theme.DarkCard
 import tech.youssefachraf.image_to_pdf.ui.theme.DarkSurface
 import tech.youssefachraf.image_to_pdf.ui.theme.PrimaryText
 import tech.youssefachraf.image_to_pdf.ui.theme.SecondaryText
 import tech.youssefachraf.image_to_pdf.viewmodel.HomeViewModel
+import tech.youssefachraf.image_to_pdf.viewmodel.PdfSortOrder
 import tech.youssefachraf.image_to_pdf.viewmodel.PickerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,18 +80,55 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToFiles: () -> Unit,
     onNavigateToPreview: () -> Unit,
+    onNavigateToSmartScan: () -> Unit,
+    onNavigateToCompress: () -> Unit,
+    onNavigateToPdfToJpg: () -> Unit,
+    onNavigateToMerge: () -> Unit,
+    onNavigateToDocxToPdf: () -> Unit,
+    onNavigateToSplit: () -> Unit,
+    onNavigateToTextToPdf: () -> Unit,
 ) {
     val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var showPickerSheet by remember { mutableStateOf(false) }
-    var selectedNavIndex by remember { mutableIntStateOf(0) }
+    var showMoreToolsSheet by remember { mutableStateOf(false) }
+    var showSortMenu by remember { mutableStateOf(false) }
 
-    var renameTarget by remember { mutableStateOf<Pair<Uri, String>?>(null) }
+    var renameTarget by remember { mutableStateOf<Pair<android.net.Uri, String>?>(null) }
     var renameText by remember { mutableStateOf("") }
+
+    val importPdfLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            homeViewModel.importPdfs(uris)
+        }
+    }
+
+    LaunchedEffect(uiState.statusMessage) {
+        val message = uiState.statusMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        homeViewModel.clearStatusMessage()
+    }
+
+    fun handleToolAction(action: ToolAction) {
+        when (action) {
+            ToolAction.IMAGE_TO_PDF -> showPickerSheet = true
+            ToolAction.SMART_SCAN -> onNavigateToSmartScan()
+            ToolAction.IMPORT_PDF -> importPdfLauncher.launch(arrayOf("application/pdf"))
+            ToolAction.COMPRESS -> onNavigateToCompress()
+            ToolAction.PDF_TO_JPG -> onNavigateToPdfToJpg()
+            ToolAction.MERGE_PDF -> onNavigateToMerge()
+            ToolAction.DOCX_TO_PDF -> onNavigateToDocxToPdf()
+            ToolAction.MORE -> showMoreToolsSheet = true
+        }
+    }
 
     Scaffold(
         containerColor = DarkBackground,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -113,40 +156,34 @@ fun HomeScreen(
                 shape = CircleShape,
                 modifier = Modifier.size(60.dp),
             ) {
-                Icon(Icons.Default.Add, "Add", modifier = Modifier.size(28.dp))
+                Icon(Icons.Default.Add, "Add images", modifier = Modifier.size(28.dp))
             }
         },
         bottomBar = {
             NavigationBar(containerColor = DarkSurface, contentColor = PrimaryText) {
                 NavigationBarItem(
-                    selected = selectedNavIndex == 0,
-                    onClick = { selectedNavIndex = 0 },
-                    icon = {
-                        Icon(
-                            if (selectedNavIndex == 0) Icons.Filled.Home else Icons.Outlined.Home,
-                            "Home"
-                        )
-                    },
+                    selected = true,
+                    onClick = {},
+                    icon = { Icon(Icons.Filled.Home, "Home") },
                     label = { Text("Home") },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = AccentBlue, selectedTextColor = AccentBlue,
-                        unselectedIconColor = SecondaryText, unselectedTextColor = SecondaryText,
+                        selectedIconColor = AccentBlue,
+                        selectedTextColor = AccentBlue,
+                        unselectedIconColor = SecondaryText,
+                        unselectedTextColor = SecondaryText,
                         indicatorColor = AccentBlue.copy(alpha = 0.12f),
                     )
                 )
                 NavigationBarItem(
-                    selected = selectedNavIndex == 1,
-                    onClick = { selectedNavIndex = 1; onNavigateToFiles() },
-                    icon = {
-                        Icon(
-                            if (selectedNavIndex == 1) Icons.Filled.Description else Icons.Outlined.Description,
-                            "Files"
-                        )
-                    },
+                    selected = false,
+                    onClick = onNavigateToFiles,
+                    icon = { Icon(Icons.Outlined.Description, "Files") },
                     label = { Text("Files") },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = AccentBlue, selectedTextColor = AccentBlue,
-                        unselectedIconColor = SecondaryText, unselectedTextColor = SecondaryText,
+                        selectedIconColor = AccentBlue,
+                        selectedTextColor = AccentBlue,
+                        unselectedIconColor = SecondaryText,
+                        unselectedTextColor = SecondaryText,
                         indicatorColor = AccentBlue.copy(alpha = 0.12f),
                     )
                 )
@@ -156,16 +193,23 @@ fun HomeScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
+                .consumeWindowInsets(paddingValues),
+            contentPadding = paddingValues,
         ) {
-            item {
+            if (uiState.isImporting) {
+                item(key = "import_progress", contentType = "progress_banner") {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = AccentBlue)
+                }
+            }
+
+            item(key = "tool_grid", contentType = "tool_grid") {
                 ToolGrid(
-                    onImageToPdfClick = { showPickerSheet = true },
-                    modifier = Modifier.height(220.dp),
+                    onToolClick = ::handleToolAction,
+                    modifier = Modifier.height(228.dp),
                 )
             }
 
-            item {
+            item(key = "section_header", contentType = "section_header") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -179,12 +223,38 @@ fun HomeScreen(
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f),
                     )
-                    Icon(Icons.AutoMirrored.Filled.Sort, "Sort", tint = SecondaryText, modifier = Modifier.size(20.dp))
+                    Box {
+                        IconButton(onClick = { showSortMenu = true }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Sort,
+                                contentDescription = "Sort PDFs",
+                                tint = SecondaryText,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showSortMenu,
+                            onDismissRequest = { showSortMenu = false },
+                        ) {
+                            PdfSortOrder.entries.forEach { order ->
+                                DropdownMenuItem(
+                                    text = { Text(order.label) },
+                                    onClick = {
+                                        showSortMenu = false
+                                        homeViewModel.setSortOrder(order)
+                                    },
+                                    trailingIcon = if (uiState.sortOrder == order) {
+                                        { Icon(Icons.Default.Check, null, tint = AccentBlue) }
+                                    } else null,
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
             if (uiState.recentPdfs.isEmpty()) {
-                item {
+                item(key = "empty_state", contentType = "empty_state") {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -196,7 +266,11 @@ fun HomeScreen(
                 }
             }
 
-            items(uiState.recentPdfs, key = { it.uri.toString() }) { pdf ->
+            items(
+                items = uiState.recentPdfs,
+                key = { it.uri.toString() },
+                contentType = { "pdf_card" },
+            ) { pdf ->
                 PdfCard(
                     pdfInfo = pdf,
                     onClick = { openPdf(context, pdf.uri) },
@@ -207,36 +281,27 @@ fun HomeScreen(
                     },
                     onDelete = { homeViewModel.deletePdf(pdf.uri) },
                     onOpen = { openPdf(context, pdf.uri) },
+                    isFavorite = pdf.uri.toString() in uiState.favoriteUris,
+                    onToggleFavorite = { homeViewModel.toggleFavorite(pdf.uri) },
+                    appContext = context,
                 )
             }
 
-            item { Spacer(modifier = Modifier.height(80.dp)) }
+            item(key = "bottom_spacer", contentType = "spacer") {
+                Spacer(modifier = Modifier.height(80.dp))
+            }
         }
     }
 
     renameTarget?.let { (uri, _) ->
-        AlertDialog(
-            onDismissRequest = { renameTarget = null },
-            containerColor = DarkCard,
-            title = { Text("Rename PDF", color = PrimaryText) },
-            text = {
-                OutlinedTextField(
-                    value = renameText,
-                    onValueChange = { renameText = it },
-                    singleLine = true,
-                    label = { Text("New name") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+        RenamePdfDialog(
+            name = renameText,
+            onNameChange = { renameText = it },
+            onConfirm = {
+                homeViewModel.renamePdf(uri, renameText)
+                renameTarget = null
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    homeViewModel.renamePdf(uri, renameText)
-                    renameTarget = null
-                }) { Text("Rename", color = AccentBlue) }
-            },
-            dismissButton = {
-                TextButton(onClick = { renameTarget = null }) { Text("Cancel", color = SecondaryText) }
-            }
+            onDismiss = { renameTarget = null },
         )
     }
 
@@ -250,26 +315,21 @@ fun HomeScreen(
             },
         )
     }
-}
 
-private fun openPdf(context: android.content.Context, uri: Uri) {
-    try {
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/pdf")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        context.startActivity(intent)
-    } catch (_: Exception) {
-        // Handle the exception if the PDF viewer is not installed
-        Log.i(TAG, "openPdf: No PDF viewer installed or unable to open PDF.")
+    if (showMoreToolsSheet) {
+        MoreToolsSheet(
+            onSelectMainTool = { action ->
+                showMoreToolsSheet = false
+                handleToolAction(action)
+            },
+            onSelectExtraTool = { extra ->
+                showMoreToolsSheet = false
+                when (extra) {
+                    ExtraToolAction.SPLIT_PDF -> onNavigateToSplit()
+                    ExtraToolAction.TEXT_TO_PDF -> onNavigateToTextToPdf()
+                }
+            },
+            onDismiss = { showMoreToolsSheet = false },
+        )
     }
-}
-
-private fun sharePdf(context: android.content.Context, uri: Uri) {
-    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-        type = "application/pdf"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    context.startActivity(Intent.createChooser(shareIntent, null))
 }
