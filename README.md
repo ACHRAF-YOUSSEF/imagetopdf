@@ -1,41 +1,43 @@
-# 📄 Image to PDF Converter (Jetpack Compose)
+# Image to PDF Converter (Jetpack Compose)
 
-A sleek, offline **PDF toolkit & image-to-PDF converter** built entirely with Kotlin and Jetpack Compose. Featuring a polished **dark-themed UI with blue accents**, the app lets you convert images, scan documents with CameraX, compress, merge, split, and export PDFs, and convert DOCX or plain text — all saved locally on your device.
-
----
-
-## ✨ Features
-
-- **🖼️ Image to PDF & Reorder:** Pick multiple images, preview full-screen with pinch-to-zoom, drag to reorder pages, select `A4`, `Letter`, or `Fit Image` page sizes, and save with custom naming and overwrite/increment conflict handling.
-- **📷 Smart Scan (CameraX):** Capture document pages with flash/lens toggles, A4 alignment overlay, gallery fallback, and local image filters (`Original`, `Magic Contrast`, `Crisp B&W`) with EXIF rotation correction.
-- **📥 Import PDF:** Bring existing PDF files into your workspace via the document picker and view them immediately in Recent PDFs.
-- **🗜️ Compress PDF:** Shrink PDF file sizes locally across three quality presets (`Low`, `Balanced`, `Extreme`) with byte-savings reporting.
-- **🧩 Merge PDF:** Combine multiple PDFs in custom drag-and-drop order.
-- **✂️ Split & Extract PDF:** Select page thumbnails or enter page range expressions (e.g., `1-3, 5`) to extract or split pages into individual or single PDFs.
-- **🖼️ PDF to JPG:** Export selected or all PDF pages to `Pictures/ImageToPdf` in `Standard` or `HD` resolution and share directly.
-- **📝 DOCX to PDF & Text to PDF:** Convert Word `.docx` files (headings, paragraphs, lists, tables, embedded images) and plain text notes into paginated A4/Letter PDFs completely offline.
-- **⭐ Favorites, Search & Sort:** Star favorite PDFs (persisted with DataStore Preferences), search in real time, and sort by date, name, or size.
-- **📤 Share, Rename & Delete:** Open, share, rename, or remove documents safely via `FileProvider` and `MediaStore`.
-- **⚙️ Settings & Info:** View build info, app details, and source links.
-- **🚀 Offline-First:** Zero internet requirement (`usesCleartextTraffic="false"`) — all document processing runs locally on your device.
+An offline **PDF toolkit and image-to-PDF converter** built with Kotlin and Jetpack Compose. Featuring a **dark-themed Material 3 UI with blue accents**, the app lets you convert images, scan documents with CameraX, import, compress, merge, split, and export PDFs, and convert DOCX or plain text files — all processed and stored locally on your device.
 
 ---
 
-## 🚀 Tech Stack
+## Features
+
+- **Image to PDF & Reorder:** Pick multiple images from your gallery, preview full-screen with pinch-to-zoom, drag to reorder pages, select `A4`, `Letter`, or `Fit Image` page sizes, and save with custom naming and overwrite or auto-increment conflict handling.
+- **Smart Scan (CameraX):** Capture document pages with flash and lens toggles, an A4 alignment overlay, gallery fallback, EXIF orientation correction, and local image filters (`Original`, `Magic Contrast`, `Crisp B&W`) before sending scans straight to reorder and export.
+- **Import PDF:** Bring existing PDF documents into the app via the system picker and manage them alongside generated files.
+- **Compress PDF:** Reduce PDF file sizes locally across three quality presets (`Low`, `Balanced`, `Extreme`) with byte-savings reporting.
+- **Merge PDF:** Combine multiple PDFs in a customizable drag-and-drop sequence.
+- **Split & Extract PDF:** Select individual page thumbnails or enter page range expressions (for example, `1-3, 5`) to extract a single combined PDF or split into separate files.
+- **PDF to JPG:** Export selected or all PDF pages to `Pictures/ImageToPdf` in `Standard` or `HD` resolution and share exported images directly.
+- **DOCX to PDF:** Convert Word `.docx` files offline (headings, paragraphs, lists, tables, and embedded images) using `ZipInputStream`, `XmlPullParser`, and `StaticLayout` pagination without heavy desktop JVM dependencies.
+- **Text to PDF:** Turn plain text notes or documents into paginated `A4` or `Letter` PDFs.
+- **Favorites, Search & Sort:** Star favorite PDFs (persisted with DataStore Preferences), filter by favorites, search in real time across files, and sort by date, name, or size.
+- **Share, Rename & Delete:** Open, share, rename, or delete PDFs safely using `MediaStore` and scoped `FileProvider` URIs across Home, Files, and Search views.
+- **Settings & Info:** View build details, app information, and source links.
+- **Offline-First & Hardened:** Zero internet dependency (`android:usesCleartextTraffic="false"`), canonical file-path confinement, and R8 code minification and resource shrinking enabled for release builds.
+
+---
+
+## Tech Stack
 
 - **Language:** [Kotlin](https://kotlinlang.org/)
 - **UI Framework:** [Jetpack Compose](https://developer.android.com/jetpack/compose) + [Material 3](https://m3.material.io/)
 - **Camera & Enhancement:** [CameraX](https://developer.android.com/training/camerax) + [AndroidX ExifInterface](https://developer.android.com/jetpack/androidx/releases/exifinterface)
 - **PDF Generation & Rendering:** [PdfDocument](https://developer.android.com/reference/android/graphics/pdf/PdfDocument) & [PdfRenderer](https://developer.android.com/reference/android/graphics/pdf/PdfRenderer)
-- **DOCX Parsing:** [XmlPullParser](https://developer.android.com/reference/org/xmlpull/v1/XmlPullParser) + `ZipInputStream` + `StaticLayout` (offline, zero heavy JVM dependencies)
+- **DOCX Parsing:** [XmlPullParser](https://developer.android.com/reference/org/xmlpull/v1/XmlPullParser) + `ZipInputStream` + `StaticLayout`
 - **Persistence & Media:** [DataStore Preferences](https://developer.android.com/topic/libraries/architecture/datastore), [MediaStore](https://developer.android.com/reference/android/provider/MediaStore) (Android 10+), `FileProvider`
 - **Image Loading & Drag-and-Drop:** [Coil](https://coil-kt.github.io/coil/) & [Reorderable](https://github.com/Calvin-LL/Reorderable)
 - **Architecture & Navigation:** MVVM (`StateFlow` + `ViewModel`) & [Navigation Compose](https://developer.android.com/jetpack/compose/navigation)
+- **Testing & Code Quality:** JUnit 4, Robolectric, Android Lint, JaCoCo, and SonarQube
 - **Min SDK:** 26 · **Target SDK:** 35
 
 ---
 
-## 🎨 Design System
+## Design System
 
 | Token              | Value       |
 |--------------------|-------------|
@@ -45,13 +47,13 @@ A sleek, offline **PDF toolkit & image-to-PDF converter** built entirely with Ko
 | Secondary Text     | `#8B949E`   |
 | Accent (Blue)      | `#2F81F7`   |
 | PDF Badge (Red)    | `#E74C3C`   |
-| Corner Radius      | 12 – 16 dp  |
+| Corner Radius      | 12 - 16 dp  |
 
 Dark-only theme with clean sans-serif typography.
 
 ---
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```
 tech.youssefachraf.image_to_pdf/
@@ -104,9 +106,9 @@ tech.youssefachraf.image_to_pdf/
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
-### 🏠 Home & File Management
+### Home & File Management
 Browse your tools and recently created PDFs, search, share, rename, or delete.
 
 <p align="center">
@@ -115,7 +117,7 @@ Browse your tools and recently created PDFs, search, share, rename, or delete.
   <img src="screenshots/home_screen_3.jpg" width="30%" alt="Home Screen 3">
 </p>
 
-### 🖼️ Image Selection, Reorder & Generation
+### Image Selection, Reorder & Generation
 Pick images, preview them full-screen, drag to reorder pages, and generate your PDF.
 
 <p align="center">
@@ -128,7 +130,7 @@ Pick images, preview them full-screen, drag to reorder pages, and generate your 
   <img src="screenshots/generating_pdf.jpg" width="30%" alt="Generating PDF">
 </p>
 
-### ⚙️ Settings
+### Settings
 View app info and access the source code.
 
 <p align="center">
@@ -137,23 +139,26 @@ View app info and access the source code.
 
 ---
 
-## 🛠️ Build & Run
+## Build & Run
 
 ```bash
 # Clone
-git clone https://github.com/ACHRAF-YOUSSEF/kotlin-projects.git
-cd kotlin-projects/image-to-pdf
+git clone https://github.com/ACHRAF-YOUSSEF/imagetopdf.git
+cd imagetopdf
 
-# Build debug APK
+# Run unit tests and Android Lint
+./gradlew testDebugUnitTest lintDebug
+
+# Build debug or R8-minified release APK
 ./gradlew assembleDebug
+./gradlew assembleRelease
 
-# Install on connected device
+# Install debug build on a connected device
 ./gradlew installDebug
 ```
 
 ---
 
-## 📄 License
+## License
 
 This project is open-source and available under the [MIT License](LICENSE).
-
